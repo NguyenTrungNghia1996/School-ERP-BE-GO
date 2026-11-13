@@ -2,9 +2,11 @@ package tenant_mgmt
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
+	"school-erp/internal/pkg/cloudflare"
 	"school-erp/internal/pkg/rediskeys"
 	"school-erp/internal/platform/audit"
 	"strings"
@@ -18,6 +20,7 @@ import (
 
 var (
 	ErrOrgNotFound              = errors.New("organization not found")
+	ErrHistoryNotFound          = errors.New("subdomain history not found")
 	ErrSubdomainInvalidFormat   = errors.New("invalid subdomain format")
 	ErrSubdomainReservedOrTaken = errors.New("subdomain is reserved or already taken")
 	ErrOrgNotPending            = errors.New("organization is not in PENDING_APPROVAL status")
@@ -27,16 +30,21 @@ var (
 var subdomainRegex = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$`)
 
 type Service struct {
-	db      *gorm.DB
-	rdb     *redis.Client
-	auditor *audit.Service
+	db          *gorm.DB
+	rdb         *redis.Client
+	cf          *cloudflare.Client
+	auditor     *audit.Service
+	provisioner *DNSProvisioner
 }
 
-func NewService(db *gorm.DB, rdb *redis.Client, auditor *audit.Service) *Service {
+func NewService(db *gorm.DB, rdb *redis.Client, cf *cloudflare.Client, auditor *audit.Service) *Service {
+	provisioner := NewDNSProvisioner(db, rdb, cf, auditor)
 	return &Service{
-		db:      db,
-		rdb:     rdb,
-		auditor: auditor,
+		db:          db,
+		rdb:         rdb,
+		cf:          cf,
+		auditor:     auditor,
+		provisioner: provisioner,
 	}
 }
 
@@ -66,14 +74,26 @@ func (s *Service) validateSubdomain(tx *gorm.DB, subdomain string, excludeOrgID 
 		return ErrSubdomainReservedOrTaken
 	}
 
+	// Kiểm tra không nằm trong các old_subdomain đang còn hạn redirect_until > NOW()
+	var redirectCount int64
+	if err := tx.Model(&OrganizationSubdomainHistory{}).
+		Where("LOWER(old_subdomain) = ? AND old_record_status = 'REDIRECTING' AND (redirect_until IS NULL OR redirect_until > ?)", subdomain, time.Now()).
+		Count(&redirectCount).Error; err != nil {
+		return err
+	}
+	if redirectCount > 0 {
+		return ErrSubdomainReservedOrTaken
+	}
+
 	return nil
 }
 
 type ListOrgsFilter struct {
-	Search string
-	Status string
-	Page   int
-	Limit  int
+	Search    string
+	Status    string
+	DNSStatus string
+	Page      int
+	Limit     int
 }
 
 func (s *Service) ListOrganizations(ctx context.Context, filter ListOrgsFilter) ([]OrganizationSummary, int64, error) {
@@ -91,6 +111,9 @@ func (s *Service) ListOrganizations(ctx context.Context, filter ListOrgsFilter) 
 	}
 	if filter.Status != "" {
 		q = q.Where("status = ?", strings.ToUpper(filter.Status))
+	}
+	if filter.DNSStatus != "" {
+		q = q.Where("dns_status = ?", strings.ToUpper(filter.DNSStatus))
 	}
 
 	var total int64
@@ -239,6 +262,7 @@ func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizati
 			TaxCode:      input.TaxCode,
 			Address:      input.Address,
 			Status:       "ACTIVE",
+			DNSStatus:    "PROVISIONING",
 			ApprovedBy:   &input.ActorID,
 			ApprovedAt:   &now,
 		}
@@ -323,6 +347,9 @@ func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizati
 		_ = s.rdb.Del(ctx, rediskeys.TenantSubdomainKey(subdomain)).Err()
 	}
 
+	// Đẩy job cấp phát CNAME lên Cloudflare bất đồng bộ
+	s.provisioner.EnqueueProvision(org.ID)
+
 	return map[string]any{
 		"organization": org,
 		"school":       school,
@@ -344,10 +371,12 @@ func (s *Service) ApproveOrganization(ctx context.Context, orgID, actorID uuid.U
 
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&org).Updates(map[string]any{
-			"status":      "ACTIVE",
-			"approved_by": actorID,
-			"approved_at": now,
-			"updated_at":  now,
+			"status":         "ACTIVE",
+			"dns_status":     "PROVISIONING",
+			"dns_last_error": nil,
+			"approved_by":    actorID,
+			"approved_at":    now,
+			"updated_at":     now,
 		}).Error; err != nil {
 			return err
 		}
@@ -360,7 +389,7 @@ func (s *Service) ApproveOrganization(ctx context.Context, orgID, actorID uuid.U
 			ResourceType:   "ORGANIZATION",
 			ResourceID:     &org.ID,
 			BeforeData:     map[string]any{"status": oldStatus},
-			AfterData:      map[string]any{"status": "ACTIVE", "approved_by": actorID},
+			AfterData:      map[string]any{"status": "ACTIVE", "dns_status": "PROVISIONING", "approved_by": actorID},
 			IPAddress:      ip,
 			UserAgent:      ua,
 		})
@@ -373,7 +402,10 @@ func (s *Service) ApproveOrganization(ctx context.Context, orgID, actorID uuid.U
 		_ = s.rdb.Del(ctx, rediskeys.TenantSubdomainKey(org.Subdomain)).Err()
 	}
 
+	s.provisioner.EnqueueProvision(org.ID)
+
 	org.Status = "ACTIVE"
+	org.DNSStatus = "PROVISIONING"
 	org.ApprovedBy = &actorID
 	org.ApprovedAt = &now
 	return &org, nil
@@ -431,6 +463,12 @@ func (s *Service) ChangeSubdomain(ctx context.Context, orgID uuid.UUID, newSubdo
 	}
 
 	oldSubdomain := org.Subdomain
+	oldCFRecordID := org.CloudflareDNSRecordID
+
+	if redirectUntil == nil {
+		defaultRedirect := time.Now().Add(30 * 24 * time.Hour)
+		redirectUntil = &defaultRedirect
+	}
 
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := s.validateSubdomain(tx, newSubdomain, &org.ID); err != nil {
@@ -438,20 +476,25 @@ func (s *Service) ChangeSubdomain(ctx context.Context, orgID uuid.UUID, newSubdo
 		}
 
 		if err := tx.Model(&org).Updates(map[string]any{
-			"subdomain":  newSubdomain,
-			"updated_at": time.Now(),
+			"subdomain":                newSubdomain,
+			"cloudflare_dns_record_id": nil,
+			"dns_status":               "PROVISIONING",
+			"dns_last_error":           nil,
+			"updated_at":               time.Now(),
 		}).Error; err != nil {
 			return err
 		}
 
 		history := OrganizationSubdomainHistory{
-			ID:             uuid.New(),
-			OrganizationID: org.ID,
-			OldSubdomain:   oldSubdomain,
-			NewSubdomain:   newSubdomain,
-			ApprovedBy:     actorID,
-			Reason:         reason,
-			RedirectUntil:  redirectUntil,
+			ID:                    uuid.New(),
+			OrganizationID:        org.ID,
+			OldSubdomain:          oldSubdomain,
+			NewSubdomain:          newSubdomain,
+			ApprovedBy:            actorID,
+			Reason:                reason,
+			RedirectUntil:         redirectUntil,
+			OldCloudflareRecordID: oldCFRecordID,
+			OldRecordStatus:       "REDIRECTING",
 		}
 		if err := tx.Create(&history).Error; err != nil {
 			return err
@@ -461,14 +504,21 @@ func (s *Service) ChangeSubdomain(ctx context.Context, orgID uuid.UUID, newSubdo
 			ActorType:      "PLATFORM",
 			ActorID:        &actorID,
 			OrganizationID: &org.ID,
-			Action:         "PLATFORM_ORG_SUBDOMAIN_CHANGED",
+			Action:         "ORG_SUBDOMAIN_CHANGED",
 			ResourceType:   "ORGANIZATION",
 			ResourceID:     &org.ID,
-			BeforeData:     map[string]any{"subdomain": oldSubdomain},
-			AfterData:      map[string]any{"subdomain": newSubdomain},
-			Reason:         reason,
-			IPAddress:      ip,
-			UserAgent:      ua,
+			BeforeData: map[string]any{
+				"subdomain":                oldSubdomain,
+				"cloudflare_dns_record_id": oldCFRecordID,
+			},
+			AfterData: map[string]any{
+				"subdomain":      newSubdomain,
+				"dns_status":     "PROVISIONING",
+				"redirect_until": redirectUntil,
+			},
+			Reason:    reason,
+			IPAddress: ip,
+			UserAgent: ua,
 		})
 	})
 	if err != nil {
@@ -482,7 +532,13 @@ func (s *Service) ChangeSubdomain(ctx context.Context, orgID uuid.UUID, newSubdo
 		_, _ = pipe.Exec(ctx)
 	}
 
+	// Đẩy job tạo CNAME mới cho newSubdomain trên Cloudflare
+	s.provisioner.EnqueueProvision(org.ID)
+
 	org.Subdomain = newSubdomain
+	org.CloudflareDNSRecordID = nil
+	org.DNSStatus = "PROVISIONING"
+	org.DNSLastError = nil
 	return &org, nil
 }
 
@@ -522,4 +578,264 @@ func (s *Service) AddReservedSubdomain(ctx context.Context, keyword, reason stri
 		return nil, err
 	}
 	return item, nil
+}
+
+// CheckSubdomainAvailability kiểm tra nhanh tính khả dụng của subdomain (Regex, Reserved, DB, Redirect History & Cloudflare API).
+func (s *Service) CheckSubdomainAvailability(ctx context.Context, subdomain string) (map[string]any, error) {
+	subdomain = strings.ToLower(strings.TrimSpace(subdomain))
+	rootDomain := "school-erp.vn"
+	if s.cf != nil {
+		rootDomain = s.cf.RootDomain()
+	}
+	fqdn := fmt.Sprintf("%s.%s", subdomain, rootDomain)
+
+	if !subdomainRegex.MatchString(subdomain) {
+		return map[string]any{
+			"subdomain": subdomain,
+			"fqdn":      fqdn,
+			"available": false,
+			"reason":    "INVALID_FORMAT",
+			"message":   "Subdomain phải dài 3-40 ký tự, chỉ gồm a-z, 0-9, '-' và không bắt đầu/kết thúc bằng '-'",
+		}, nil
+	}
+
+	var reservedCount int64
+	s.db.WithContext(ctx).Model(&ReservedSubdomain{}).Where("LOWER(keyword) = ?", subdomain).Count(&reservedCount)
+	if reservedCount > 0 {
+		return map[string]any{
+			"subdomain": subdomain,
+			"fqdn":      fqdn,
+			"available": false,
+			"reason":    "RESERVED_KEYWORD",
+			"message":   "Subdomain nằm trong danh sách từ khóa hệ thống giữ chỗ",
+		}, nil
+	}
+
+	var orgCount int64
+	s.db.WithContext(ctx).Model(&Organization{}).Where("LOWER(subdomain) = ?", subdomain).Count(&orgCount)
+	if orgCount > 0 {
+		return map[string]any{
+			"subdomain": subdomain,
+			"fqdn":      fqdn,
+			"available": false,
+			"reason":    "TAKEN_BY_ORGANIZATION",
+			"message":   "Subdomain đã được một Tổ chức khác sử dụng",
+		}, nil
+	}
+
+	var redirectCount int64
+	s.db.WithContext(ctx).Model(&OrganizationSubdomainHistory{}).
+		Where("LOWER(old_subdomain) = ? AND old_record_status = 'REDIRECTING' AND (redirect_until IS NULL OR redirect_until > ?)", subdomain, time.Now()).
+		Count(&redirectCount)
+	if redirectCount > 0 {
+		return map[string]any{
+			"subdomain": subdomain,
+			"fqdn":      fqdn,
+			"available": false,
+			"reason":    "ACTIVE_REDIRECT_HISTORY",
+			"message":   "Subdomain đang trong thời gian chuyển hướng (Redirect 301/308) từ một Tổ chức cũ",
+		}, nil
+	}
+
+	cfChecked := false
+	if s.cf != nil && s.cf.IsConfigured() {
+		cfChecked = true
+		rec, err := s.cf.FindRecordByFQDN(ctx, fqdn)
+		if err == nil && rec != nil {
+			return map[string]any{
+				"subdomain":          subdomain,
+				"fqdn":               fqdn,
+				"available":          false,
+				"cloudflare_checked": true,
+				"reason":             "EXISTS_ON_CLOUDFLARE",
+				"message":            "Tên miền phụ đã tồn tại bản ghi DNS trên Cloudflare",
+			}, nil
+		}
+	}
+
+	return map[string]any{
+		"subdomain":          subdomain,
+		"fqdn":               fqdn,
+		"available":          true,
+		"cloudflare_checked": cfChecked,
+		"reason":             "AVAILABLE",
+		"message":            "Subdomain hợp lệ và có thể sử dụng",
+	}, nil
+}
+
+// RetryOrganizationDNS kích hoạt lại tiến trình đồng bộ DNS lên Cloudflare cho một Organization.
+func (s *Service) RetryOrganizationDNS(ctx context.Context, orgID, actorID uuid.UUID, ip, ua string) (*Organization, error) {
+	var org Organization
+	if err := s.db.WithContext(ctx).First(&org, "id = ?", orgID).Error; err != nil {
+		return nil, ErrOrgNotFound
+	}
+
+	oldDNSStatus := org.DNSStatus
+	now := time.Now()
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&org).Updates(map[string]any{
+			"dns_status":     "PROVISIONING",
+			"dns_last_error": nil,
+			"updated_at":     now,
+		}).Error; err != nil {
+			return err
+		}
+
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:      "PLATFORM",
+			ActorID:        &actorID,
+			OrganizationID: &org.ID,
+			Action:         "CLOUDFLARE_DNS_RETRY_REQUESTED",
+			ResourceType:   "ORGANIZATION",
+			ResourceID:     &org.ID,
+			BeforeData:     map[string]any{"dns_status": oldDNSStatus, "dns_last_error": org.DNSLastError},
+			AfterData:      map[string]any{"dns_status": "PROVISIONING"},
+			IPAddress:      ip,
+			UserAgent:      ua,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	s.provisioner.EnqueueProvision(org.ID)
+
+	org.DNSStatus = "PROVISIONING"
+	org.DNSLastError = nil
+	return &org, nil
+}
+
+// DeleteRedirectHistoryDNS ngắt redirect sớm và xóa ngay bản ghi DNS của subdomain cũ trên Cloudflare.
+func (s *Service) DeleteRedirectHistoryDNS(ctx context.Context, historyID, actorID uuid.UUID, ip, ua string) (*OrganizationSubdomainHistory, error) {
+	var history OrganizationSubdomainHistory
+	if err := s.db.WithContext(ctx).First(&history, "id = ?", historyID).Error; err != nil {
+		return nil, ErrHistoryNotFound
+	}
+
+	if history.OldCloudflareRecordID != nil && *history.OldCloudflareRecordID != "" && s.cf != nil && s.cf.IsConfigured() {
+		if err := s.cf.DeleteRecord(ctx, *history.OldCloudflareRecordID); err != nil {
+			return nil, err
+		}
+	}
+
+	now := time.Now()
+	oldStatus := history.OldRecordStatus
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&history).Updates(map[string]any{
+			"old_record_status": "DELETED",
+			"cleaned_up_at":     now,
+			"redirect_until":    now,
+		}).Error; err != nil {
+			return err
+		}
+
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:      "PLATFORM",
+			ActorID:        &actorID,
+			OrganizationID: &history.OrganizationID,
+			Action:         "SUBDOMAIN_REDIRECT_TERMINATED",
+			ResourceType:   "ORGANIZATION_SUBDOMAIN_HISTORY",
+			ResourceID:     &history.ID,
+			BeforeData:     map[string]any{"old_subdomain": history.OldSubdomain, "old_record_status": oldStatus},
+			AfterData:      map[string]any{"old_subdomain": history.OldSubdomain, "old_record_status": "DELETED", "cleaned_up_at": now},
+			IPAddress:      ip,
+			UserAgent:      ua,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if s.rdb != nil {
+		_ = s.rdb.Del(ctx, rediskeys.TenantSubdomainKey(history.OldSubdomain)).Err()
+	}
+
+	history.OldRecordStatus = "DELETED"
+	history.CleanedUpAt = &now
+	history.RedirectUntil = &now
+	return &history, nil
+}
+
+// ResolveTenantBySubdomain xác định trạng thái của một subdomain: ACTIVE, SUSPENDED, REDIRECT, hoặc NOT_FOUND (có cache Redis 30m).
+func (s *Service) ResolveTenantBySubdomain(ctx context.Context, subdomain string) (map[string]any, error) {
+	subdomain = strings.ToLower(strings.TrimSpace(subdomain))
+	cacheKey := rediskeys.TenantSubdomainKey(subdomain)
+
+	if s.rdb != nil {
+		cached, err := s.rdb.Get(ctx, cacheKey).Result()
+		if err == nil && cached != "" {
+			var res map[string]any
+			if err := json.Unmarshal([]byte(cached), &res); err == nil {
+				return res, nil
+			}
+		}
+	}
+
+	// 1. Tra bảng organizations
+	var org Organization
+	err := s.db.WithContext(ctx).Where("LOWER(subdomain) = ?", subdomain).First(&org).Error
+	if err == nil {
+		res := map[string]any{
+			"action":          org.Status, // ACTIVE, SUSPENDED, PENDING_APPROVAL
+			"organization_id": org.ID,
+			"code":            org.Code,
+			"name":            org.Name,
+			"subdomain":       org.Subdomain,
+			"dns_status":      org.DNSStatus,
+		}
+		if s.rdb != nil {
+			if raw, err := json.Marshal(res); err == nil {
+				_ = s.rdb.Set(ctx, cacheKey, string(raw), rediskeys.TTLTenantSubdomain).Err()
+			}
+		}
+		return res, nil
+	}
+
+	// 2. Tra bảng organization_subdomain_histories (Redirect 301/308)
+	var history OrganizationSubdomainHistory
+	err = s.db.WithContext(ctx).
+		Where("LOWER(old_subdomain) = ? AND old_record_status = 'REDIRECTING' AND (redirect_until IS NULL OR redirect_until > ?)", subdomain, time.Now()).
+		Order("created_at DESC").
+		First(&history).Error
+	if err == nil {
+		targetSubdomain := history.NewSubdomain
+		var currentOrg Organization
+		if err := s.db.WithContext(ctx).First(&currentOrg, "id = ?", history.OrganizationID).Error; err == nil {
+			targetSubdomain = currentOrg.Subdomain
+		}
+
+		rootDomain := "school-erp.vn"
+		if s.cf != nil {
+			rootDomain = s.cf.RootDomain()
+		}
+
+		res := map[string]any{
+			"action":          "REDIRECT",
+			"organization_id": history.OrganizationID,
+			"old_subdomain":   subdomain,
+			"new_subdomain":   targetSubdomain,
+			"target_url":      fmt.Sprintf("https://%s.%s", targetSubdomain, rootDomain),
+			"redirect_until":  history.RedirectUntil,
+		}
+		if s.rdb != nil {
+			ttl := rediskeys.TTLTenantSubdomain
+			if history.RedirectUntil != nil {
+				rem := time.Until(*history.RedirectUntil)
+				if rem > 0 && rem < ttl {
+					ttl = rem
+				}
+			}
+			if raw, err := json.Marshal(res); err == nil {
+				_ = s.rdb.Set(ctx, cacheKey, string(raw), ttl).Err()
+			}
+		}
+		return res, nil
+	}
+
+	return map[string]any{
+		"action":    "NOT_FOUND",
+		"subdomain": subdomain,
+	}, nil
 }

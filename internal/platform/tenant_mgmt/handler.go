@@ -37,10 +37,11 @@ func (h *Handler) ListOrganizations(c *fiber.Ctx) error {
 	search := c.Query("search", c.Query("q"))
 
 	orgs, total, err := h.service.ListOrganizations(ctx, ListOrgsFilter{
-		Search: search,
-		Status: c.Query("status"),
-		Page:   page,
-		Limit:  limit,
+		Search:    search,
+		Status:    c.Query("status"),
+		DNSStatus: c.Query("dns_status"),
+		Page:      page,
+		Limit:     limit,
 	})
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể lấy danh sách Tổ chức", err.Error())

@@ -11,13 +11,16 @@ import (
 	"school-erp/internal/platform/menu"
 	"school-erp/internal/platform/support"
 	"school-erp/internal/platform/tenant_mgmt"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 )
 
 func RegisterRoutes(api fiber.Router) {
 	db := config.DB
 	rdb := config.RedisClient
+	cf := config.CloudflareClient
 
 	auditService := audit.NewService(db)
 	auditHandler := audit.NewHandler(auditService)
@@ -31,7 +34,7 @@ func RegisterRoutes(api fiber.Router) {
 	iamService := iam.NewService(db, rdb, auditService)
 	iamHandler := iam.NewHandler(iamService)
 
-	tenantService := tenant_mgmt.NewService(db, rdb, auditService)
+	tenantService := tenant_mgmt.NewService(db, rdb, cf, auditService)
 	tenantHandler := tenant_mgmt.NewHandler(tenantService)
 
 	catalogService := catalog.NewService(db, auditService)
@@ -44,6 +47,13 @@ func RegisterRoutes(api fiber.Router) {
 	supportHandler := support.NewHandler(supportService)
 
 	v1 := api.Group("/v1")
+
+	// Public API: Phân giải Subdomain của Tổ chức & Redirect 301/308 (Rate-limited + Cache Redis 30m)
+	v1.Get("/public/tenant-resolve", limiter.New(limiter.Config{
+		Max:        120,
+		Expiration: 1 * time.Minute,
+	}), tenantHandler.PublicTenantResolve)
+
 	p := v1.Group("/platform")
 
 	// Nhóm 1: Auth & Profile (Public + Authenticated)
@@ -69,14 +79,17 @@ func RegisterRoutes(api fiber.Router) {
 	protected.Get("/permissions", middleware.RequirePlatformPermission("platform:user:read"), iamHandler.ListPermissions)
 	protected.Get("/menus/tree", middleware.RequirePlatformPermission("platform:user:read"), menuHandler.GetTree)
 
-	// Nhóm 3: Quản trị Organization & Subdomain
+	// Nhóm 3: Quản trị Organization, Subdomain & Cloudflare DNS
+	protected.Get("/organizations/check-subdomain", middleware.RequirePlatformPermission("platform:org:read"), tenantHandler.CheckSubdomain)
 	protected.Get("/organizations", middleware.RequirePlatformPermission("platform:org:read"), tenantHandler.ListOrganizations)
 	protected.Get("/organizations/:id", middleware.RequirePlatformPermission("platform:org:read"), tenantHandler.GetOrganization)
 	protected.Post("/organizations", middleware.RequirePlatformPermission("platform:org:create"), tenantHandler.CreateOrganization)
 	protected.Post("/organizations/:id/approve", middleware.RequirePlatformPermission("platform:org:approve"), tenantHandler.ApproveOrganization)
 	protected.Patch("/organizations/:id/status", middleware.RequirePlatformPermission("platform:org:status"), tenantHandler.UpdateOrganizationStatus)
 	protected.Post("/organizations/:id/change-subdomain", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.ChangeSubdomain)
+	protected.Post("/organizations/:id/dns/retry", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.RetryDNS)
 
+	protected.Delete("/subdomain-histories/:history_id/dns", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.DeleteRedirectHistoryDNS)
 	protected.Get("/reserved-subdomains", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.ListReservedSubdomains)
 	protected.Post("/reserved-subdomains", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.AddReservedSubdomain)
 

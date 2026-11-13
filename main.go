@@ -20,6 +20,7 @@ func main() {
 	config.ConnectDB()
 	config.RunMigrations()
 	config.ConnectRedis()
+	config.InitCloudflare()
 
 	if err := seed.Run(config.DB); err != nil {
 		log.Printf("⚠️ Lỗi chạy seed dữ liệu: %v\n", err)
