@@ -7,6 +7,7 @@ import (
 	_ "school-erp/docs"
 	"school-erp/middleware"
 	"school-erp/routes"
+	"school-erp/seed"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -18,6 +19,11 @@ import (
 func main() {
 	config.ConnectDB()
 	config.RunMigrations()
+	config.ConnectRedis()
+
+	if err := seed.Run(config.DB); err != nil {
+		log.Printf("⚠️ Lỗi chạy seed dữ liệu: %v\n", err)
+	}
 
 	app := fiber.New()
 	middleware.Setup(app)

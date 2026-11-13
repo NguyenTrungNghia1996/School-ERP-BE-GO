@@ -1,0 +1,109 @@
+package platform
+
+import (
+	"school-erp/config"
+	"school-erp/internal/middleware"
+	"school-erp/internal/platform/audit"
+	"school-erp/internal/platform/auth"
+	"school-erp/internal/platform/billing"
+	"school-erp/internal/platform/catalog"
+	"school-erp/internal/platform/iam"
+	"school-erp/internal/platform/menu"
+	"school-erp/internal/platform/support"
+	"school-erp/internal/platform/tenant_mgmt"
+
+	"github.com/gofiber/fiber/v2"
+)
+
+func RegisterRoutes(api fiber.Router) {
+	db := config.DB
+	rdb := config.RedisClient
+
+	auditService := audit.NewService(db)
+	auditHandler := audit.NewHandler(auditService)
+
+	menuService := menu.NewService(db, rdb, auditService)
+	menuHandler := menu.NewHandler(menuService)
+
+	authService := auth.NewService(db, rdb, menuService, auditService)
+	authHandler := auth.NewHandler(authService)
+
+	iamService := iam.NewService(db, rdb, auditService)
+	iamHandler := iam.NewHandler(iamService)
+
+	tenantService := tenant_mgmt.NewService(db, rdb, auditService)
+	tenantHandler := tenant_mgmt.NewHandler(tenantService)
+
+	catalogService := catalog.NewService(db, auditService)
+	catalogHandler := catalog.NewHandler(catalogService)
+
+	billingService := billing.NewService(db, rdb, auditService)
+	billingHandler := billing.NewHandler(billingService)
+
+	supportService := support.NewService(db, rdb, auditService)
+	supportHandler := support.NewHandler(supportService)
+
+	v1 := api.Group("/v1")
+	p := v1.Group("/platform")
+
+	// Nhóm 1: Auth & Profile (Public + Authenticated)
+	p.Post("/auth/login", authHandler.Login)
+	p.Post("/auth/refresh", authHandler.Refresh)
+
+	protected := p.Group("", middleware.PlatformAuthMiddleware())
+	protected.Post("/auth/logout", authHandler.Logout)
+	protected.Get("/me", authHandler.Me)
+	protected.Post("/me/mfa/setup", authHandler.SetupMFA)
+	protected.Post("/me/mfa/enable", authHandler.EnableMFA)
+	protected.Post("/me/mfa/disable", authHandler.DisableMFA)
+
+	// Nhóm 2: Quản trị Nhân sự & Phân quyền Platform
+	protected.Get("/users", middleware.RequirePlatformPermission("platform:user:read"), iamHandler.ListUsers)
+	protected.Post("/users", middleware.RequirePlatformPermission("platform:user:manage"), iamHandler.CreateUser)
+	protected.Put("/users/:id/roles", middleware.RequirePlatformPermission("platform:user:manage"), iamHandler.UpdateUserRoles)
+	protected.Patch("/users/:id/status", middleware.RequirePlatformPermission("platform:user:manage"), iamHandler.UpdateUserStatus)
+
+	protected.Get("/roles", middleware.RequirePlatformPermission("platform:user:read"), iamHandler.ListRoles)
+	protected.Post("/roles", middleware.RequirePlatformPermission("platform:role:manage"), iamHandler.CreateRole)
+	protected.Put("/roles/:id/permissions", middleware.RequirePlatformPermission("platform:role:manage"), iamHandler.UpdateRolePermissions)
+	protected.Get("/permissions", middleware.RequirePlatformPermission("platform:user:read"), iamHandler.ListPermissions)
+	protected.Get("/menus/tree", middleware.RequirePlatformPermission("platform:user:read"), menuHandler.GetTree)
+
+	// Nhóm 3: Quản trị Organization & Subdomain
+	protected.Get("/organizations", middleware.RequirePlatformPermission("platform:org:read"), tenantHandler.ListOrganizations)
+	protected.Get("/organizations/:id", middleware.RequirePlatformPermission("platform:org:read"), tenantHandler.GetOrganization)
+	protected.Post("/organizations", middleware.RequirePlatformPermission("platform:org:create"), tenantHandler.CreateOrganization)
+	protected.Post("/organizations/:id/approve", middleware.RequirePlatformPermission("platform:org:approve"), tenantHandler.ApproveOrganization)
+	protected.Patch("/organizations/:id/status", middleware.RequirePlatformPermission("platform:org:status"), tenantHandler.UpdateOrganizationStatus)
+	protected.Post("/organizations/:id/change-subdomain", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.ChangeSubdomain)
+
+	protected.Get("/reserved-subdomains", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.ListReservedSubdomains)
+	protected.Post("/reserved-subdomains", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.AddReservedSubdomain)
+
+	// Nhóm 4: Quản trị Catalog & Gói dịch vụ
+	protected.Get("/catalog/features", middleware.RequirePlatformPermission("platform:feature:manage"), catalogHandler.ListFeatures)
+	protected.Post("/catalog/features", middleware.RequirePlatformPermission("platform:feature:manage"), catalogHandler.CreateFeature)
+	protected.Get("/catalog/permissions", middleware.RequirePlatformPermission("platform:permission:manage"), catalogHandler.ListPermissions)
+	protected.Post("/catalog/permissions", middleware.RequirePlatformPermission("platform:permission:manage"), catalogHandler.CreatePermission)
+	protected.Get("/catalog/menus/tree", middleware.RequirePlatformPermission("platform:menu:manage"), catalogHandler.GetMenuTree)
+	protected.Put("/catalog/menus/tree", middleware.RequirePlatformPermission("platform:menu:manage"), catalogHandler.UpdateMenuTree)
+
+	protected.Get("/packages", middleware.RequirePlatformPermission("platform:package:read"), billingHandler.ListPackages)
+	protected.Post("/packages", middleware.RequirePlatformPermission("platform:package:manage"), billingHandler.CreatePackage)
+	protected.Post("/packages/:id/versions", middleware.RequirePlatformPermission("platform:package:manage"), billingHandler.CreatePackageVersion)
+	protected.Put("/package-versions/:id", middleware.RequirePlatformPermission("platform:package:manage"), billingHandler.UpdatePackageVersion)
+	protected.Post("/package-versions/:id/publish", middleware.RequirePlatformPermission("platform:package:manage"), billingHandler.PublishPackageVersion)
+
+	protected.Post("/organizations/:org_id/subscriptions", middleware.RequirePlatformPermission("platform:subscription:manage"), billingHandler.CreateSubscription)
+	protected.Patch("/subscriptions/:id/revoke", middleware.RequirePlatformPermission("platform:subscription:manage"), billingHandler.RevokeSubscription)
+
+	// Nhóm 5: Support Mode
+	protected.Get("/support-sessions", middleware.RequirePlatformPermission("platform:support:request"), supportHandler.ListSessions)
+	protected.Post("/support-sessions", middleware.RequirePlatformPermission("platform:support:request"), supportHandler.CreateSession)
+	protected.Post("/support-sessions/:id/approve", middleware.RequirePlatformPermission("platform:support:approve"), supportHandler.ApproveSession)
+	protected.Post("/support-sessions/:id/exchange-token", middleware.RequirePlatformPermission("platform:support:request"), supportHandler.ExchangeToken)
+	protected.Post("/support-sessions/:id/revoke", middleware.RequirePlatformPermission("platform:support:revoke"), supportHandler.RevokeSession)
+
+	// Nhóm 6: Audit Logs
+	protected.Get("/audit-logs", middleware.RequirePlatformPermission("platform:audit:read"), auditHandler.List)
+}

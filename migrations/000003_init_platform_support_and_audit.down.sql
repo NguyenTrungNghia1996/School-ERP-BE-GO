@@ -1,0 +1,15 @@
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS support_access_sessions;
+DROP TABLE IF EXISTS organization_subdomain_histories;
+DROP TABLE IF EXISTS reserved_subdomains;
+DROP TABLE IF EXISTS organization_subscriptions;
+DROP TABLE IF EXISTS service_package_features;
+DROP TABLE IF EXISTS service_package_versions;
+DROP TABLE IF EXISTS service_packages;
+DROP TABLE IF EXISTS menus;
+DROP TABLE IF EXISTS permissions;
+DROP TABLE IF EXISTS features;
+DROP TABLE IF EXISTS school_memberships;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS schools;
+DROP TABLE IF EXISTS organizations;
