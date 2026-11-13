@@ -1,0 +1,26 @@
+basePath: /api
+info:
+  contact: {}
+  description: REST API for School ERP
+  title: School ERP API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Check API and database health
+      tags:
+      - Health
+swagger: "2.0"
