@@ -233,3 +233,81 @@ func (h *Handler) UpdateRolePermissions(c *fiber.Ctx) error {
 		"permission_codes": body.PermissionCodes,
 	})
 }
+
+func (h *Handler) ResetUserPassword(c *fiber.Ctx) error {
+	targetID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID người dùng không hợp lệ", nil)
+	}
+
+	var body struct {
+		NewPassword        string `json:"new_password"`
+		MustChangePassword *bool  `json:"must_change_password"`
+		Reason             string `json:"reason"`
+	}
+	if err := c.BodyParser(&body); err != nil || strings.TrimSpace(body.NewPassword) == "" {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "new_password là bắt buộc", nil)
+	}
+
+	mustChange := true
+	if body.MustChangePassword != nil {
+		mustChange = *body.MustChangePassword
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = h.service.ResetUserPassword(ctx, targetID, body.NewPassword, mustChange, strings.TrimSpace(body.Reason), getActorUUID(c), c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrWeakPassword):
+			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Mật khẩu mới phải có tối thiểu 8 ký tự", nil)
+		case errors.Is(err, ErrUserNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy người dùng", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể đặt lại mật khẩu nhân sự", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{
+		"user_id":              targetID,
+		"must_change_password": mustChange,
+	})
+}
+
+func (h *Handler) ForceDisableUserMFA(c *fiber.Ctx) error {
+	targetID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID người dùng không hợp lệ", nil)
+	}
+
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.BodyParser(&body)
+	reason := strings.TrimSpace(body.Reason)
+	if reason == "" {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Bắt buộc nhập lý do (reason) khi tắt MFA của thành viên (VD: Mất thiết bị xác thực)", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = h.service.ForceDisableUserMFA(ctx, targetID, reason, getActorUUID(c), c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrUserNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy người dùng", nil)
+		case errors.Is(err, ErrMFANotEnabled):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Thành viên này hiện chưa bật xác thực 2 lớp (MFA)", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể tắt MFA cho thành viên", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{
+		"user_id":     targetID,
+		"mfa_enabled": false,
+	})
+}
+

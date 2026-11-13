@@ -139,7 +139,8 @@ func (s *Service) ListOrganizations(ctx context.Context, filter ListOrgsFilter) 
 		s.db.WithContext(ctx).Raw(`
 			SELECT sp.name AS package_name, os.expires_at
 			FROM organization_subscriptions os
-			JOIN service_packages sp ON sp.id = os.package_id
+			JOIN service_package_versions spv ON spv.id = os.package_version_id
+			JOIN service_packages sp ON sp.id = spv.package_id
 			WHERE os.organization_id = ?
 			  AND os.subscription_type = 'PRIMARY'
 			  AND os.status = 'ACTIVE'
@@ -169,13 +170,14 @@ func (s *Service) GetOrganizationDetail(ctx context.Context, orgID uuid.UUID) (m
 
 	var subscriptions []map[string]any
 	s.db.WithContext(ctx).Raw(`
-		SELECT os.id, os.package_id, sp.code AS package_code, sp.name AS package_name,
-		       os.package_version_id, spv.version AS package_version,
+		SELECT os.id, spv.package_id, sp.code AS package_code, sp.name AS package_name,
+		       os.package_version_id, spv.version_number AS version_number, spv.version_label AS version_label,
 		       os.subscription_type, os.status, os.started_at, os.expires_at,
+		       os.custom_quotas, os.auto_renew, os.notes,
 		       os.revoked_at, os.revoke_reason, os.created_at
 		FROM organization_subscriptions os
-		JOIN service_packages sp ON sp.id = os.package_id
 		JOIN service_package_versions spv ON spv.id = os.package_version_id
+		JOIN service_packages sp ON sp.id = spv.package_id
 		WHERE os.organization_id = ?
 		ORDER BY os.created_at DESC
 	`, orgID).Scan(&subscriptions)

@@ -200,6 +200,40 @@ func (h *Handler) DisableMFA(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, fiber.Map{"mfa_enabled": false})
 }
 
+func (h *Handler) ChangePassword(c *fiber.Ctx) error {
+	userID, _ := c.Locals("platform_user_id").(string)
+	currentJTI, _ := c.Locals("platform_jti").(string)
+	if userID == "" {
+		return response.Error(c, fiber.StatusUnauthorized, response.ErrCodeUnauthorized, "Chưa xác thực", nil)
+	}
+
+	var body struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := c.BodyParser(&body); err != nil || body.CurrentPassword == "" || body.NewPassword == "" {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "current_password và new_password là bắt buộc", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.ChangePassword(ctx, userID, currentJTI, body.CurrentPassword, body.NewPassword, c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, ErrWeakPassword):
+			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Mật khẩu mới phải có tối thiểu 8 ký tự", nil)
+		case errors.Is(err, ErrSamePassword):
+			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Mật khẩu mới phải khác mật khẩu hiện tại", nil)
+		case errors.Is(err, ErrInvalidCredentials):
+			return response.Error(c, fiber.StatusUnauthorized, response.ErrCodeInvalidCredentials, "Mật khẩu hiện tại không chính xác", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể đổi mật khẩu", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"password_changed": true})
+}
+
 func loadUserPermissions(ctx context.Context, userID string) ([]string, error) {
 	authzKey := rediskeys.PlatformUserAuthzKey(userID)
 	if config.RedisClient != nil {

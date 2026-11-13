@@ -43,6 +43,10 @@ func TenantEntitlementKey(orgID string) string {
 	return fmt.Sprintf("tenant:entitlement:%s", orgID)
 }
 
+func TenantMenusPattern(orgID string) string {
+	return fmt.Sprintf("tenant:menus:%s:*", orgID)
+}
+
 func SupportSessionKey(sessionID string) string {
 	return fmt.Sprintf("support:session:%s", sessionID)
 }

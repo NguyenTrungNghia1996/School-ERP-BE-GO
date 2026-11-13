@@ -24,6 +24,8 @@ var (
 	ErrMFANotSetup        = errors.New("mfa secret has not been initialized")
 	ErrMFAAlreadyEnabled  = errors.New("mfa is already enabled")
 	ErrMFANotEnabled      = errors.New("mfa is not enabled")
+	ErrWeakPassword       = errors.New("new password must be at least 8 characters")
+	ErrSamePassword       = errors.New("new password must be different from current password")
 	ErrSessionExpired     = errors.New("session expired or revoked")
 )
 
@@ -350,3 +352,76 @@ func (s *Service) DisableMFA(ctx context.Context, userID, password, otpCode, ip,
 		return nil
 	})
 }
+
+// ChangePassword allows an authenticated platform user to change their own password.
+func (s *Service) ChangePassword(ctx context.Context, userID, currentJTI, currentPassword, newPassword, ip, ua string) error {
+	if len(strings.TrimSpace(newPassword)) < 8 {
+		return ErrWeakPassword
+	}
+	if currentPassword == newPassword {
+		return ErrSamePassword
+	}
+
+	var user iam.PlatformUser
+	if err := s.db.WithContext(ctx).First(&user, "id = ?", userID).Error; err != nil {
+		return err
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPassword)); err != nil {
+		return ErrInvalidCredentials
+	}
+
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&user).Updates(map[string]any{
+			"password_hash":        string(hashedBytes),
+			"must_change_password": false,
+			"updated_at":           now,
+		}).Error; err != nil {
+			return err
+		}
+
+		if s.auditor != nil {
+			return s.auditor.Log(tx, audit.AuditEntry{
+				ActorType:    "PLATFORM",
+				ActorID:      &user.ID,
+				Action:       "PLATFORM_SELF_PASSWORD_CHANGED",
+				ResourceType: "PLATFORM_USER",
+				ResourceID:   &user.ID,
+				AfterData:    map[string]any{"must_change_password": false, "changed_at": now},
+				IPAddress:    ip,
+				UserAgent:    ua,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Thu hồi các phiên đăng nhập khác trên Redis (giữ lại phiên hiện tại currentJTI)
+	if s.rdb != nil {
+		userSessionsKey := rediskeys.PlatformUserSessionsKey(user.ID.String())
+		jtis, err := s.rdb.SMembers(ctx, userSessionsKey).Result()
+		if err == nil && len(jtis) > 0 {
+			pipe := s.rdb.Pipeline()
+			for _, jti := range jtis {
+				if jti == currentJTI {
+					continue
+				}
+				pipe.Del(ctx, rediskeys.PlatformSessionKey(jti))
+				pipe.Set(ctx, rediskeys.PlatformBlacklistJTIKey(jti), "1", rediskeys.TTLPlatformSession)
+				pipe.SRem(ctx, userSessionsKey, jti)
+			}
+			_, _ = pipe.Exec(ctx)
+		}
+	}
+
+	return nil
+}
+

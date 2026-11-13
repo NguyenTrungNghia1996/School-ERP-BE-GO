@@ -2,17 +2,31 @@ package catalog
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"regexp"
 	"school-erp/internal/platform/audit"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 var (
-	ErrCodeAlreadyExists = errors.New("catalog code already exists")
-	ErrFeatureNotFound   = errors.New("feature not found")
+	ErrCodeAlreadyExists         = errors.New("catalog code already exists")
+	ErrFeatureNotFound           = errors.New("feature not found")
+	ErrPermissionNotFound        = errors.New("permission not found")
+	ErrRouteNotFound             = errors.New("tenant route not found")
+	ErrInvalidFeatureCodeFormat  = errors.New("feature code must match ^[A-Z0-9_]+$")
+	ErrInvalidPermCodeFormat     = errors.New("permission code must match ^[a-z0-9_]+:[a-z0-9_]+$")
+	ErrFeatureInUseCannotModify  = errors.New("feature is already in use and cannot change code")
+	ErrItemMenuRequiresRoute     = errors.New("menu of type ITEM requires a valid route_id")
+)
+
+var (
+	featureCodeRegex = regexp.MustCompile(`^[A-Z0-9_]+$`)
+	permCodeRegex    = regexp.MustCompile(`^[a-z0-9_]+:[a-z0-9_]+$`)
 )
 
 type Service struct {
@@ -27,9 +41,29 @@ func NewService(db *gorm.DB, auditor *audit.Service) *Service {
 	}
 }
 
-func (s *Service) ListFeatures(ctx context.Context) ([]Feature, error) {
+type ListFeaturesFilter struct {
+	Module   string
+	IsActive string
+	Search   string
+}
+
+func (s *Service) ListFeatures(ctx context.Context, filter ListFeaturesFilter) ([]Feature, error) {
+	q := s.db.WithContext(ctx).Model(&Feature{})
+	if filter.Module != "" {
+		q = q.Where("UPPER(module) = ?", strings.ToUpper(strings.TrimSpace(filter.Module)))
+	}
+	if filter.IsActive == "true" || filter.IsActive == "1" {
+		q = q.Where("is_active = ?", true)
+	} else if filter.IsActive == "false" || filter.IsActive == "0" {
+		q = q.Where("is_active = ?", false)
+	}
+	if filter.Search != "" {
+		like := "%" + strings.TrimSpace(filter.Search) + "%"
+		q = q.Where("code ILIKE ? OR name ILIKE ?", like, like)
+	}
+
 	var features []Feature
-	if err := s.db.WithContext(ctx).Order("module ASC, code ASC").Find(&features).Error; err != nil {
+	if err := q.Order("is_core DESC, module ASC, code ASC").Find(&features).Error; err != nil {
 		return nil, err
 	}
 	return features, nil
@@ -40,6 +74,7 @@ type CreateFeatureInput struct {
 	Name        string    `json:"name"`
 	Module      string    `json:"module"`
 	Description *string   `json:"description"`
+	IsCore      bool      `json:"is_core"`
 	IsActive    *bool     `json:"is_active"`
 	ActorID     uuid.UUID `json:"-"`
 	IPAddress   string    `json:"-"`
@@ -47,9 +82,13 @@ type CreateFeatureInput struct {
 }
 
 func (s *Service) CreateFeature(ctx context.Context, input CreateFeatureInput) (*Feature, error) {
-	code := strings.ToLower(strings.TrimSpace(input.Code))
+	code := strings.ToUpper(strings.TrimSpace(input.Code))
+	if !featureCodeRegex.MatchString(code) {
+		return nil, ErrInvalidFeatureCodeFormat
+	}
+
 	var count int64
-	s.db.WithContext(ctx).Model(&Feature{}).Where("LOWER(code) = ?", code).Count(&count)
+	s.db.WithContext(ctx).Model(&Feature{}).Where("UPPER(code) = ?", code).Count(&count)
 	if count > 0 {
 		return nil, ErrCodeAlreadyExists
 	}
@@ -65,6 +104,7 @@ func (s *Service) CreateFeature(ctx context.Context, input CreateFeatureInput) (
 		Name:        strings.TrimSpace(input.Name),
 		Module:      strings.ToUpper(strings.TrimSpace(input.Module)),
 		Description: input.Description,
+		IsCore:      input.IsCore,
 		IsActive:    isActive,
 	}
 
@@ -91,13 +131,112 @@ func (s *Service) CreateFeature(ctx context.Context, input CreateFeatureInput) (
 	return feature, nil
 }
 
-func (s *Service) ListPermissions(ctx context.Context, featureID string) ([]TenantPermission, error) {
-	q := s.db.WithContext(ctx).Model(&TenantPermission{})
-	if featureID != "" {
-		q = q.Where("feature_id = ?", featureID)
+type UpdateFeatureInput struct {
+	Code        *string   `json:"code"`
+	Name        *string   `json:"name"`
+	Module      *string   `json:"module"`
+	Description *string   `json:"description"`
+	IsCore      *bool     `json:"is_core"`
+	IsActive    *bool     `json:"is_active"`
+	ActorID     uuid.UUID `json:"-"`
+	IPAddress   string    `json:"-"`
+	UserAgent   string    `json:"-"`
+}
+
+func (s *Service) UpdateFeature(ctx context.Context, featureID uuid.UUID, input UpdateFeatureInput) (*Feature, error) {
+	var feature Feature
+	if err := s.db.WithContext(ctx).First(&feature, "id = ?", featureID).Error; err != nil {
+		return nil, ErrFeatureNotFound
 	}
+
+	beforeSnap := feature
+	updates := map[string]any{"updated_at": time.Now()}
+
+	if input.Code != nil {
+		newCode := strings.ToUpper(strings.TrimSpace(*input.Code))
+		if newCode != "" && newCode != feature.Code {
+			if !featureCodeRegex.MatchString(newCode) {
+				return nil, ErrInvalidFeatureCodeFormat
+			}
+			// Không cho sửa code nếu Feature đã được gán vào service_package_version hoặc permissions
+			var pkgCount, permCount int64
+			s.db.WithContext(ctx).Table("service_package_features").Where("feature_id = ?", featureID).Count(&pkgCount)
+			s.db.WithContext(ctx).Model(&TenantPermission{}).Where("feature_id = ?", featureID).Count(&permCount)
+			if pkgCount > 0 || permCount > 0 {
+				return nil, ErrFeatureInUseCannotModify
+			}
+			updates["code"] = newCode
+			feature.Code = newCode
+		}
+	}
+	if input.Name != nil && strings.TrimSpace(*input.Name) != "" {
+		name := strings.TrimSpace(*input.Name)
+		updates["name"] = name
+		feature.Name = name
+	}
+	if input.Module != nil && strings.TrimSpace(*input.Module) != "" {
+		mod := strings.ToUpper(strings.TrimSpace(*input.Module))
+		updates["module"] = mod
+		feature.Module = mod
+	}
+	if input.Description != nil {
+		updates["description"] = input.Description
+		feature.Description = input.Description
+	}
+	if input.IsCore != nil {
+		updates["is_core"] = *input.IsCore
+		feature.IsCore = *input.IsCore
+	}
+	if input.IsActive != nil {
+		updates["is_active"] = *input.IsActive
+		feature.IsActive = *input.IsActive
+	}
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&Feature{}).Where("id = ?", featureID).Updates(updates).Error; err != nil {
+			return err
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &input.ActorID,
+			Action:       "CATALOG_FEATURE_UPDATED",
+			ResourceType: "FEATURE",
+			ResourceID:   &featureID,
+			BeforeData:   beforeSnap,
+			AfterData:    feature,
+			IPAddress:    input.IPAddress,
+			UserAgent:    input.UserAgent,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &feature, nil
+}
+
+type ListPermissionsFilter struct {
+	FeatureID   string
+	Resource    string
+	IsSensitive string
+}
+
+func (s *Service) ListPermissions(ctx context.Context, filter ListPermissionsFilter) ([]TenantPermission, error) {
+	q := s.db.WithContext(ctx).Model(&TenantPermission{}).Preload("Feature")
+	if filter.FeatureID != "" {
+		q = q.Where("feature_id = ?", filter.FeatureID)
+	}
+	if filter.Resource != "" {
+		q = q.Where("LOWER(resource) = ?", strings.ToLower(strings.TrimSpace(filter.Resource)))
+	}
+	if filter.IsSensitive == "true" || filter.IsSensitive == "1" {
+		q = q.Where("is_sensitive = ?", true)
+	} else if filter.IsSensitive == "false" || filter.IsSensitive == "0" {
+		q = q.Where("is_sensitive = ?", false)
+	}
+
 	var perms []TenantPermission
-	if err := q.Order("code ASC").Find(&perms).Error; err != nil {
+	if err := q.Order("resource ASC, code ASC").Find(&perms).Error; err != nil {
 		return nil, err
 	}
 	return perms, nil
@@ -106,8 +245,12 @@ func (s *Service) ListPermissions(ctx context.Context, featureID string) ([]Tena
 type CreatePermissionInput struct {
 	FeatureID   uuid.UUID `json:"feature_id"`
 	Code        string    `json:"code"`
+	Resource    string    `json:"resource"`
+	Action      string    `json:"action"`
 	Name        string    `json:"name"`
 	Description *string   `json:"description"`
+	IsSensitive bool      `json:"is_sensitive"`
+	IsActive    *bool     `json:"is_active"`
 	ActorID     uuid.UUID `json:"-"`
 	IPAddress   string    `json:"-"`
 	UserAgent   string    `json:"-"`
@@ -120,18 +263,41 @@ func (s *Service) CreatePermission(ctx context.Context, input CreatePermissionIn
 	}
 
 	code := strings.ToLower(strings.TrimSpace(input.Code))
+	if !permCodeRegex.MatchString(code) {
+		return nil, ErrInvalidPermCodeFormat
+	}
+
+	parts := strings.SplitN(code, ":", 2)
+	resource := strings.ToLower(strings.TrimSpace(input.Resource))
+	if resource == "" {
+		resource = parts[0]
+	}
+	action := strings.ToLower(strings.TrimSpace(input.Action))
+	if action == "" {
+		action = parts[1]
+	}
+
 	var count int64
 	s.db.WithContext(ctx).Model(&TenantPermission{}).Where("LOWER(code) = ?", code).Count(&count)
 	if count > 0 {
 		return nil, ErrCodeAlreadyExists
 	}
 
+	isActive := true
+	if input.IsActive != nil {
+		isActive = *input.IsActive
+	}
+
 	perm := &TenantPermission{
 		ID:          uuid.New(),
 		FeatureID:   input.FeatureID,
 		Code:        code,
+		Resource:    resource,
+		Action:      action,
 		Name:        strings.TrimSpace(input.Name),
 		Description: input.Description,
+		IsSensitive: input.IsSensitive,
+		IsActive:    isActive,
 	}
 
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -154,12 +320,89 @@ func (s *Service) CreatePermission(ctx context.Context, input CreatePermissionIn
 		return nil, err
 	}
 
+	perm.Feature = &feature
 	return perm, nil
+}
+
+type UpdatePermissionInput struct {
+	Code        *string   `json:"code"`
+	Name        *string   `json:"name"`
+	Description *string   `json:"description"`
+	IsSensitive *bool     `json:"is_sensitive"`
+	IsActive    *bool     `json:"is_active"`
+	ActorID     uuid.UUID `json:"-"`
+	IPAddress   string    `json:"-"`
+	UserAgent   string    `json:"-"`
+}
+
+func (s *Service) UpdatePermission(ctx context.Context, permID uuid.UUID, input UpdatePermissionInput) (*TenantPermission, error) {
+	var perm TenantPermission
+	if err := s.db.WithContext(ctx).Preload("Feature").First(&perm, "id = ?", permID).Error; err != nil {
+		return nil, ErrPermissionNotFound
+	}
+
+	if input.Code != nil && strings.ToLower(strings.TrimSpace(*input.Code)) != perm.Code {
+		return nil, ErrFeatureInUseCannotModify
+	}
+
+	beforeSnap := perm
+	updates := map[string]any{"updated_at": time.Now()}
+	if input.Name != nil && strings.TrimSpace(*input.Name) != "" {
+		name := strings.TrimSpace(*input.Name)
+		updates["name"] = name
+		perm.Name = name
+	}
+	if input.Description != nil {
+		updates["description"] = input.Description
+		perm.Description = input.Description
+	}
+	if input.IsSensitive != nil {
+		updates["is_sensitive"] = *input.IsSensitive
+		perm.IsSensitive = *input.IsSensitive
+	}
+	if input.IsActive != nil {
+		updates["is_active"] = *input.IsActive
+		perm.IsActive = *input.IsActive
+	}
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&TenantPermission{}).Where("id = ?", permID).Updates(updates).Error; err != nil {
+			return err
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &input.ActorID,
+			Action:       "CATALOG_PERMISSION_UPDATED",
+			ResourceType: "TENANT_PERMISSION",
+			ResourceID:   &permID,
+			BeforeData:   beforeSnap,
+			AfterData:    perm,
+			IPAddress:    input.IPAddress,
+			UserAgent:    input.UserAgent,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &perm, nil
+}
+
+func (s *Service) ListRoutes(ctx context.Context) ([]TenantRoute, error) {
+	var routes []TenantRoute
+	if err := s.db.WithContext(ctx).Order("route_key ASC").Find(&routes).Error; err != nil {
+		return nil, err
+	}
+	return routes, nil
 }
 
 func (s *Service) GetTenantBaseMenuTree(ctx context.Context) ([]TenantMenuTreeNode, error) {
 	var items []TenantBaseMenu
-	if err := s.db.WithContext(ctx).Order("sort_order ASC, created_at ASC").Find(&items).Error; err != nil {
+	if err := s.db.WithContext(ctx).
+		Preload("Route").
+		Preload("Feature").
+		Order("sort_order ASC, created_at ASC").
+		Find(&items).Error; err != nil {
 		return nil, err
 	}
 	return buildTenantMenuTree(items, nil), nil
@@ -181,88 +424,178 @@ func buildTenantMenuTree(items []TenantBaseMenu, parentID *uuid.UUID) []TenantMe
 		idCopy := item.ID
 		children := buildTenantMenuTree(items, &idCopy)
 
+		var reqPerms []string
+		_ = json.Unmarshal(item.RequiredPermissions, &reqPerms)
+		if reqPerms == nil {
+			reqPerms = []string{}
+		}
+
+		var portals []string
+		_ = json.Unmarshal(item.TargetPortals, &portals)
+		if portals == nil {
+			portals = []string{"SCHOOL_ADMIN"}
+		}
+
+		var pathPtr *string
+		if item.Route != nil {
+			p := item.Route.Path
+			pathPtr = &p
+		}
+
+		var featCodePtr *string
+		if item.Feature != nil {
+			fc := item.Feature.Code
+			featCodePtr = &fc
+		}
+
 		nodes = append(nodes, TenantMenuTreeNode{
-			ID:                     item.ID,
-			FeatureID:              item.FeatureID,
-			Key:                    item.MenuKey,
-			Label:                  item.Label,
-			Icon:                   item.Icon,
-			Path:                   item.RoutePath,
-			Type:                   item.MenuType,
-			RequiredPermissionCode: item.RequiredPermissionCode,
-			SortOrder:              item.SortOrder,
-			Hidden:                 item.IsHidden,
-			IsActive:               item.IsActive,
-			Children:               children,
+			ID:                  item.ID,
+			ParentID:            item.ParentID,
+			Key:                 item.MenuKey,
+			Label:               item.Label,
+			Icon:                item.Icon,
+			Type:                item.MenuType,
+			RouteID:             item.RouteID,
+			Path:                pathPtr,
+			FeatureID:           item.FeatureID,
+			FeatureCode:         featCodePtr,
+			RequiredPermissions: reqPerms,
+			PermissionMatchMode: item.PermissionMatchMode,
+			TargetPortals:       portals,
+			IsMandatory:         item.IsMandatory,
+			SortOrder:           item.SortOrder,
+			IsActive:            item.IsActive,
+			Children:            children,
 		})
 	}
 	return nodes
 }
 
-func (s *Service) ReplaceTenantBaseMenuTree(ctx context.Context, tree []TenantMenuTreeNode, actorID uuid.UUID, ip, ua string) ([]TenantMenuTreeNode, error) {
+type CreateMenuInput struct {
+	ParentID            *uuid.UUID `json:"parent_id"`
+	MenuKey             string     `json:"menu_key"`
+	Label               string     `json:"label"`
+	Icon                *string    `json:"icon"`
+	MenuType            string     `json:"menu_type"`
+	RouteID             *uuid.UUID `json:"route_id"`
+	FeatureID           *uuid.UUID `json:"feature_id"`
+	RequiredPermissions []string   `json:"required_permissions"`
+	PermissionMatchMode string     `json:"permission_match_mode"`
+	TargetPortals       []string   `json:"target_portals"`
+	IsMandatory         bool       `json:"is_mandatory"`
+	SortOrder           int        `json:"sort_order"`
+	IsActive            *bool      `json:"is_active"`
+	ActorID             uuid.UUID  `json:"-"`
+	IPAddress           string     `json:"-"`
+	UserAgent           string     `json:"-"`
+}
+
+func (s *Service) CreateMenuNode(ctx context.Context, input CreateMenuInput) (*TenantBaseMenu, error) {
+	menuType := strings.ToUpper(strings.TrimSpace(input.MenuType))
+	if menuType == "" {
+		menuType = "ITEM"
+	}
+
+	if menuType == "ITEM" {
+		if input.RouteID == nil || *input.RouteID == uuid.Nil {
+			return nil, ErrItemMenuRequiresRoute
+		}
+		var route TenantRoute
+		if err := s.db.WithContext(ctx).First(&route, "id = ?", *input.RouteID).Error; err != nil {
+			return nil, ErrRouteNotFound
+		}
+	}
+
+	matchMode := strings.ToUpper(strings.TrimSpace(input.PermissionMatchMode))
+	if matchMode != "ALL" {
+		matchMode = "ANY"
+	}
+
+	reqPermsBytes := []byte("[]")
+	if len(input.RequiredPermissions) > 0 {
+		if b, err := json.Marshal(input.RequiredPermissions); err == nil {
+			reqPermsBytes = b
+		}
+	}
+
+	portalsBytes := []byte(`["SCHOOL_ADMIN"]`)
+	if len(input.TargetPortals) > 0 {
+		if b, err := json.Marshal(input.TargetPortals); err == nil {
+			portalsBytes = b
+		}
+	}
+
+	isActive := true
+	if input.IsActive != nil {
+		isActive = *input.IsActive
+	}
+
+	node := &TenantBaseMenu{
+		ID:                  uuid.New(),
+		ParentID:            input.ParentID,
+		MenuKey:             strings.TrimSpace(input.MenuKey),
+		Label:               strings.TrimSpace(input.Label),
+		Icon:                input.Icon,
+		MenuType:            menuType,
+		RouteID:             input.RouteID,
+		FeatureID:           input.FeatureID,
+		RequiredPermissions: reqPermsBytes,
+		PermissionMatchMode: matchMode,
+		TargetPortals:       portalsBytes,
+		IsMandatory:         input.IsMandatory,
+		SortOrder:           input.SortOrder,
+		IsActive:            isActive,
+	}
+
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&TenantBaseMenu{}).Error; err != nil {
+		if err := tx.Create(node).Error; err != nil {
 			return err
 		}
-
-		if err := insertMenuTreeNodes(tx, tree, nil); err != nil {
-			return err
-		}
-
 		return s.auditor.Log(tx, audit.AuditEntry{
 			ActorType:    "PLATFORM",
-			ActorID:      &actorID,
-			Action:       "CATALOG_TENANT_MENU_TREE_UPDATED",
+			ActorID:      &input.ActorID,
+			Action:       "CATALOG_TENANT_MENU_CREATED",
 			ResourceType: "TENANT_BASE_MENU",
-			AfterData:    map[string]any{"root_nodes_count": len(tree)},
-			IPAddress:    ip,
-			UserAgent:    ua,
+			ResourceID:   &node.ID,
+			AfterData:    node,
+			IPAddress:    input.IPAddress,
+			UserAgent:    input.UserAgent,
 		})
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return s.GetTenantBaseMenuTree(ctx)
+	return node, nil
 }
 
-func insertMenuTreeNodes(tx *gorm.DB, nodes []TenantMenuTreeNode, parentID *uuid.UUID) error {
-	for idx, n := range nodes {
-		id := n.ID
-		if id == uuid.Nil {
-			id = uuid.New()
-		}
-		menuType := strings.ToUpper(strings.TrimSpace(n.Type))
-		if menuType == "" {
-			menuType = "ITEM"
-		}
-		sortOrder := n.SortOrder
-		if sortOrder == 0 {
-			sortOrder = idx + 1
-		}
-		row := TenantBaseMenu{
-			ID:                     id,
-			ParentID:               parentID,
-			FeatureID:              n.FeatureID,
-			MenuKey:                strings.TrimSpace(n.Key),
-			Label:                  strings.TrimSpace(n.Label),
-			Icon:                   n.Icon,
-			RoutePath:              n.Path,
-			MenuType:               menuType,
-			RequiredPermissionCode: n.RequiredPermissionCode,
-			SortOrder:              sortOrder,
-			IsHidden:               n.Hidden,
-			IsActive:               true,
-		}
-		if err := tx.Create(&row).Error; err != nil {
-			return err
-		}
-		if len(n.Children) > 0 {
-			idCopy := row.ID
-			if err := insertMenuTreeNodes(tx, n.Children, &idCopy); err != nil {
+type ReorderMenuItem struct {
+	ID        uuid.UUID  `json:"id"`
+	ParentID  *uuid.UUID `json:"parent_id"`
+	SortOrder int        `json:"sort_order"`
+}
+
+func (s *Service) ReorderMenus(ctx context.Context, items []ReorderMenuItem, actorID uuid.UUID, ip, ua string) error {
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		for _, item := range items {
+			if err := tx.Model(&TenantBaseMenu{}).Where("id = ?", item.ID).Updates(map[string]any{
+				"parent_id":  item.ParentID,
+				"sort_order": item.SortOrder,
+				"updated_at": now,
+			}).Error; err != nil {
 				return err
 			}
 		}
-	}
-	return nil
+
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &actorID,
+			Action:       "CATALOG_TENANT_MENUS_REORDERED",
+			ResourceType: "TENANT_BASE_MENU",
+			AfterData:    map[string]any{"reordered_count": len(items)},
+			IPAddress:    ip,
+			UserAgent:    ua,
+		})
+	})
 }

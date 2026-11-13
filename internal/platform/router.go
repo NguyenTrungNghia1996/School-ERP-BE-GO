@@ -63,6 +63,8 @@ func RegisterRoutes(api fiber.Router) {
 	protected := p.Group("", middleware.PlatformAuthMiddleware())
 	protected.Post("/auth/logout", authHandler.Logout)
 	protected.Get("/me", authHandler.Me)
+	protected.Post("/me/change-password", authHandler.ChangePassword)
+	protected.Patch("/me/password", authHandler.ChangePassword)
 	protected.Post("/me/mfa/setup", authHandler.SetupMFA)
 	protected.Post("/me/mfa/enable", authHandler.EnableMFA)
 	protected.Post("/me/mfa/disable", authHandler.DisableMFA)
@@ -72,6 +74,9 @@ func RegisterRoutes(api fiber.Router) {
 	protected.Post("/users", middleware.RequirePlatformPermission("platform:user:manage"), iamHandler.CreateUser)
 	protected.Put("/users/:id/roles", middleware.RequirePlatformPermission("platform:user:manage"), iamHandler.UpdateUserRoles)
 	protected.Patch("/users/:id/status", middleware.RequirePlatformPermission("platform:user:manage"), iamHandler.UpdateUserStatus)
+	protected.Patch("/users/:id/password", middleware.RequirePlatformPermission("platform:user:manage"), iamHandler.ResetUserPassword)
+	protected.Delete("/users/:id/mfa", middleware.RequirePlatformPermission("platform:user:manage"), iamHandler.ForceDisableUserMFA)
+	protected.Patch("/users/:id/mfa/disable", middleware.RequirePlatformPermission("platform:user:manage"), iamHandler.ForceDisableUserMFA)
 
 	protected.Get("/roles", middleware.RequirePlatformPermission("platform:user:read"), iamHandler.ListRoles)
 	protected.Post("/roles", middleware.RequirePlatformPermission("platform:role:manage"), iamHandler.CreateRole)
@@ -93,22 +98,39 @@ func RegisterRoutes(api fiber.Router) {
 	protected.Get("/reserved-subdomains", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.ListReservedSubdomains)
 	protected.Post("/reserved-subdomains", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.AddReservedSubdomain)
 
-	// Nhóm 4: Quản trị Catalog & Gói dịch vụ
+	// Nhóm 4.1: Quản trị Catalog (Features, Permissions, Base Menus, Routes)
 	protected.Get("/catalog/features", middleware.RequirePlatformPermission("platform:feature:manage"), catalogHandler.ListFeatures)
 	protected.Post("/catalog/features", middleware.RequirePlatformPermission("platform:feature:manage"), catalogHandler.CreateFeature)
+	protected.Put("/catalog/features/:id", middleware.RequirePlatformPermission("platform:feature:manage"), catalogHandler.UpdateFeature)
+
 	protected.Get("/catalog/permissions", middleware.RequirePlatformPermission("platform:permission:manage"), catalogHandler.ListPermissions)
 	protected.Post("/catalog/permissions", middleware.RequirePlatformPermission("platform:permission:manage"), catalogHandler.CreatePermission)
-	protected.Get("/catalog/menus/tree", middleware.RequirePlatformPermission("platform:menu:manage"), catalogHandler.GetMenuTree)
-	protected.Put("/catalog/menus/tree", middleware.RequirePlatformPermission("platform:menu:manage"), catalogHandler.UpdateMenuTree)
+	protected.Put("/catalog/permissions/:id", middleware.RequirePlatformPermission("platform:permission:manage"), catalogHandler.UpdatePermission)
 
+	protected.Get("/catalog/menus/tree", middleware.RequirePlatformPermission("platform:menu:manage"), catalogHandler.GetMenuTree)
+	protected.Post("/catalog/menus", middleware.RequirePlatformPermission("platform:menu:manage"), catalogHandler.CreateMenu)
+	protected.Put("/catalog/menus/reorder", middleware.RequirePlatformPermission("platform:menu:manage"), catalogHandler.ReorderMenus)
+	protected.Get("/catalog/routes", middleware.RequirePlatformPermission("platform:menu:manage"), catalogHandler.ListRoutes)
+
+	// Nhóm 4.2: Quản trị Gói dịch vụ & Phiên bản (Packages & Versions)
 	protected.Get("/packages", middleware.RequirePlatformPermission("platform:package:read"), billingHandler.ListPackages)
 	protected.Post("/packages", middleware.RequirePlatformPermission("platform:package:manage"), billingHandler.CreatePackage)
+	protected.Get("/packages/:id", middleware.RequirePlatformPermission("platform:package:read"), billingHandler.GetPackage)
 	protected.Post("/packages/:id/versions", middleware.RequirePlatformPermission("platform:package:manage"), billingHandler.CreatePackageVersion)
-	protected.Put("/package-versions/:id", middleware.RequirePlatformPermission("platform:package:manage"), billingHandler.UpdatePackageVersion)
-	protected.Post("/package-versions/:id/publish", middleware.RequirePlatformPermission("platform:package:manage"), billingHandler.PublishPackageVersion)
 
+	protected.Put("/package-versions/:version_id", middleware.RequirePlatformPermission("platform:package:manage"), billingHandler.UpdatePackageVersion)
+	protected.Post("/package-versions/:version_id/publish", middleware.RequirePlatformPermission("platform:package:manage"), billingHandler.PublishPackageVersion)
+	protected.Post("/package-versions/:version_id/deprecate", middleware.RequirePlatformPermission("platform:package:manage"), billingHandler.DeprecatePackageVersion)
+
+	// Nhóm 4.3: Cấp & Quản lý Subscription / Entitlement cho Organization
+	protected.Get("/organizations/:org_id/subscriptions", middleware.RequirePlatformPermission("platform:org:read"), billingHandler.ListOrgSubscriptions)
+	protected.Get("/organizations/:org_id/entitlements", middleware.RequirePlatformPermission("platform:org:read"), billingHandler.GetOrgEntitlements)
 	protected.Post("/organizations/:org_id/subscriptions", middleware.RequirePlatformPermission("platform:subscription:manage"), billingHandler.CreateSubscription)
-	protected.Patch("/subscriptions/:id/revoke", middleware.RequirePlatformPermission("platform:subscription:manage"), billingHandler.RevokeSubscription)
+	protected.Post("/organizations/:org_id/switch-primary", middleware.RequirePlatformPermission("platform:subscription:manage"), billingHandler.SwitchPrimaryPackage)
+
+	protected.Post("/subscriptions/:sub_id/renew", middleware.RequirePlatformPermission("platform:subscription:manage"), billingHandler.RenewSubscription)
+	protected.Patch("/subscriptions/:sub_id/suspend", middleware.RequirePlatformPermission("platform:subscription:manage"), billingHandler.SuspendSubscription)
+	protected.Patch("/subscriptions/:sub_id/revoke", middleware.RequirePlatformPermission("platform:subscription:manage"), billingHandler.RevokeSubscription)
 
 	// Nhóm 5: Support Mode
 	protected.Get("/support-sessions", middleware.RequirePlatformPermission("platform:support:request"), supportHandler.ListSessions)

@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS organization_subscriptions CASCADE;
+DROP TABLE IF EXISTS service_package_features CASCADE;
+DROP TABLE IF EXISTS service_package_versions CASCADE;
+DROP TABLE IF EXISTS service_packages CASCADE;
+DROP TABLE IF EXISTS menus CASCADE;
+DROP TABLE IF EXISTS tenant_routes CASCADE;
+DROP TABLE IF EXISTS permissions CASCADE;
+DROP TABLE IF EXISTS features CASCADE;

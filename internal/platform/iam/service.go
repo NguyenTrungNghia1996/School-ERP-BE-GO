@@ -21,6 +21,8 @@ var (
 	ErrRoleCodeTaken         = errors.New("role code already exists")
 	ErrLastRootAdmin         = errors.New("cannot remove or lock the last ROOT_ADMIN user")
 	ErrSelfLockNotAllowed    = errors.New("cannot lock your own account")
+	ErrWeakPassword          = errors.New("password must be at least 8 characters")
+	ErrMFANotEnabled         = errors.New("target user does not have MFA enabled")
 )
 
 type Service struct {
@@ -509,3 +511,112 @@ func (s *Service) UpdateRolePermissions(ctx context.Context, roleID uuid.UUID, p
 
 	return nil
 }
+
+// ResetUserPassword allows a Platform Admin to reset a member's password and revoke their active sessions.
+func (s *Service) ResetUserPassword(ctx context.Context, targetUserID uuid.UUID, newPassword string, mustChange bool, reason string, actorID uuid.UUID, ip, ua string) error {
+	if len(strings.TrimSpace(newPassword)) < 8 {
+		return ErrWeakPassword
+	}
+
+	var user PlatformUser
+	if err := s.db.WithContext(ctx).First(&user, "id = ?", targetUserID).Error; err != nil {
+		return ErrUserNotFound
+	}
+
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&user).Updates(map[string]any{
+			"password_hash":        string(hashedBytes),
+			"must_change_password": mustChange,
+			"updated_at":           now,
+		}).Error; err != nil {
+			return err
+		}
+
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &actorID,
+			Action:       "PLATFORM_USER_PASSWORD_RESET",
+			ResourceType: "PLATFORM_USER",
+			ResourceID:   &targetUserID,
+			AfterData: map[string]any{
+				"user_id":              targetUserID,
+				"must_change_password": mustChange,
+			},
+			Reason:    reason,
+			IPAddress: ip,
+			UserAgent: ua,
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	s.revokeAllUserSessions(ctx, targetUserID.String())
+	return nil
+}
+
+// ForceDisableUserMFA allows a Platform Admin to turn off MFA for a member who lost their authenticator device.
+func (s *Service) ForceDisableUserMFA(ctx context.Context, targetUserID uuid.UUID, reason string, actorID uuid.UUID, ip, ua string) error {
+	var user PlatformUser
+	if err := s.db.WithContext(ctx).First(&user, "id = ?", targetUserID).Error; err != nil {
+		return ErrUserNotFound
+	}
+	if !user.MFAEnabled {
+		return ErrMFANotEnabled
+	}
+
+	now := time.Now()
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&user).Updates(map[string]any{
+			"mfa_enabled": false,
+			"mfa_secret":  nil,
+			"updated_at":  now,
+		}).Error; err != nil {
+			return err
+		}
+
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &actorID,
+			Action:       "PLATFORM_USER_MFA_FORCE_DISABLED",
+			ResourceType: "PLATFORM_USER",
+			ResourceID:   &targetUserID,
+			BeforeData:   map[string]any{"mfa_enabled": true},
+			AfterData:    map[string]any{"mfa_enabled": false},
+			Reason:       reason,
+			IPAddress:    ip,
+			UserAgent:    ua,
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	// Vô hiệu hóa toàn bộ session cũ để đảm bảo thiết bị bị mất không còn truy cập được
+	s.revokeAllUserSessions(ctx, targetUserID.String())
+	return nil
+}
+
+func (s *Service) revokeAllUserSessions(ctx context.Context, userIDStr string) {
+	if s.rdb == nil {
+		return
+	}
+	userSessionsKey := rediskeys.PlatformUserSessionsKey(userIDStr)
+	jtis, err := s.rdb.SMembers(ctx, userSessionsKey).Result()
+	pipe := s.rdb.Pipeline()
+	if err == nil {
+		for _, jti := range jtis {
+			pipe.Del(ctx, rediskeys.PlatformSessionKey(jti))
+			pipe.Set(ctx, rediskeys.PlatformBlacklistJTIKey(jti), "1", rediskeys.TTLPlatformSession)
+		}
+	}
+	pipe.Del(ctx, userSessionsKey)
+	_, _ = pipe.Exec(ctx)
+}
+
