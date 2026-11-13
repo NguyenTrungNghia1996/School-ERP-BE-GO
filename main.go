@@ -17,6 +17,7 @@ import (
 // @BasePath /api
 func main() {
 	config.ConnectDB()
+	config.RunMigrations()
 
 	app := fiber.New()
 	middleware.Setup(app)

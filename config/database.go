@@ -4,12 +4,16 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	migratepg "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -102,4 +106,28 @@ func ConnectDB() {
 
 	DB = db
 	log.Printf("✅ Kết nối PostgreSQL thành công sau %v\n", time.Since(start))
+}
+
+// RunMigrations executes pending SQL migrations from ./migrations using golang-migrate.
+func RunMigrations() {
+	sqlDB, err := DB.DB()
+	if err != nil {
+		log.Fatalf("❌ Lỗi lấy sql.DB để migrate: %v", err)
+	}
+
+	driver, err := migratepg.WithInstance(sqlDB, &migratepg.Config{})
+	if err != nil {
+		log.Fatalf("❌ Lỗi khởi tạo driver golang-migrate: %v", err)
+	}
+
+	m, err := migrate.NewWithDatabaseInstance("file://migrations", "postgres", driver)
+	if err != nil {
+		log.Fatalf("❌ Lỗi đọc thư mục migrations: %v", err)
+	}
+
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		log.Fatalf("❌ Lỗi chạy migration: %v", err)
+	}
+
+	log.Println("✅ Chạy database migrations thành công")
 }
