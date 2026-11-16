@@ -2,9 +2,8 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  cmd = "go build -o ./tmp/main.exe ."
-  bin = "./tmp/main.exe"
+  cmd = "swag init && go build -o ./tmp/main ."
+  bin = "./tmp/main"
   include_ext = ["go", "env"]
-  exclude_dir = ["tmp", "vendor", "docs", "postman"]
+  exclude_dir = ["tmp", "vendor", "docs", "postman", "migrations"]
   delay = 1000
-

@@ -28,6 +28,16 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 	return uuid.Nil
 }
 
+// ListFeatures godoc
+// @Summary Danh sách tính năng (Feature Catalog)
+// @Tags Platform Catalog
+// @Produce json
+// @Security BearerAuth
+// @Param module query string false "Module"
+// @Param is_active query string false "Trạng thái kích hoạt"
+// @Param search query string false "Tìm kiếm"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/catalog/features [get]
 func (h *Handler) ListFeatures(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -44,6 +54,15 @@ func (h *Handler) ListFeatures(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, features)
 }
 
+// CreateFeature godoc
+// @Summary Tạo mới tính năng trong Catalog
+// @Tags Platform Catalog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body CreateFeatureInput true "Thông tin tính năng"
+// @Success 201 {object} map[string]any
+// @Router /v1/platform/catalog/features [post]
 func (h *Handler) CreateFeature(c *fiber.Ctx) error {
 	var body CreateFeatureInput
 	if err := c.BodyParser(&body); err != nil {
@@ -75,6 +94,16 @@ func (h *Handler) CreateFeature(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, feature)
 }
 
+// UpdateFeature godoc
+// @Summary Cập nhật tính năng trong Catalog
+// @Tags Platform Catalog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Feature ID"
+// @Param body body UpdateFeatureInput true "Thông tin cập nhật"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/catalog/features/{id} [put]
 func (h *Handler) UpdateFeature(c *fiber.Ctx) error {
 	featureID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -110,6 +139,16 @@ func (h *Handler) UpdateFeature(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, feature)
 }
 
+// ListPermissions godoc
+// @Summary Danh sách quyền Tenant (Permission Catalog)
+// @Tags Platform Catalog
+// @Produce json
+// @Security BearerAuth
+// @Param feature_id query string false "Feature ID"
+// @Param resource query string false "Resource"
+// @Param is_sensitive query string false "Quyền nhạy cảm"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/catalog/permissions [get]
 func (h *Handler) ListPermissions(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -126,6 +165,15 @@ func (h *Handler) ListPermissions(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, perms)
 }
 
+// CreatePermission godoc
+// @Summary Tạo mới quyền Tenant trong Catalog
+// @Tags Platform Catalog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body CreatePermissionInput true "Thông tin quyền"
+// @Success 201 {object} map[string]any
+// @Router /v1/platform/catalog/permissions [post]
 func (h *Handler) CreatePermission(c *fiber.Ctx) error {
 	var body CreatePermissionInput
 	if err := c.BodyParser(&body); err != nil {
@@ -159,6 +207,16 @@ func (h *Handler) CreatePermission(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, perm)
 }
 
+// UpdatePermission godoc
+// @Summary Cập nhật quyền Tenant trong Catalog
+// @Tags Platform Catalog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Permission ID"
+// @Param body body UpdatePermissionInput true "Thông tin cập nhật"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/catalog/permissions/{id} [put]
 func (h *Handler) UpdatePermission(c *fiber.Ctx) error {
 	permID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -192,6 +250,13 @@ func (h *Handler) UpdatePermission(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, perm)
 }
 
+// ListRoutes godoc
+// @Summary Danh sách Route của Tenant
+// @Tags Platform Catalog
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/catalog/routes [get]
 func (h *Handler) ListRoutes(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -204,6 +269,13 @@ func (h *Handler) ListRoutes(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, routes)
 }
 
+// GetMenuTree godoc
+// @Summary Cây menu nền của Tenant (Base Menu Tree)
+// @Tags Platform Catalog
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/catalog/menus/tree [get]
 func (h *Handler) GetMenuTree(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -216,6 +288,15 @@ func (h *Handler) GetMenuTree(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, tree)
 }
 
+// CreateMenu godoc
+// @Summary Tạo node mới trên cây menu nền của Tenant
+// @Tags Platform Catalog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body CreateMenuInput true "Thông tin node menu"
+// @Success 201 {object} map[string]any
+// @Router /v1/platform/catalog/menus [post]
 func (h *Handler) CreateMenu(c *fiber.Ctx) error {
 	var body CreateMenuInput
 	if err := c.BodyParser(&body); err != nil {
@@ -247,6 +328,15 @@ func (h *Handler) CreateMenu(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, node)
 }
 
+// ReorderMenus godoc
+// @Summary Sắp xếp lại cây menu nền của Tenant
+// @Tags Platform Catalog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body []ReorderMenuItem true "Danh sách thứ tự menu"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/catalog/menus/reorder [put]
 func (h *Handler) ReorderMenus(c *fiber.Ctx) error {
 	var body struct {
 		Items []ReorderMenuItem `json:"items"`

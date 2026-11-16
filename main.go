@@ -16,6 +16,10 @@ import (
 // @version 1.0
 // @description REST API for School ERP
 // @BasePath /api
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Nhập theo cú pháp: Bearer <token>
 func main() {
 	config.ConnectDB()
 	config.RunMigrations()

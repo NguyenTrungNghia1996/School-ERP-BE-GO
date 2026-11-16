@@ -14,6 +14,20 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
+// List godoc
+// @Summary Truy vấn nhật ký kiểm toán (Audit Logs)
+// @Tags Platform Audit
+// @Produce json
+// @Security BearerAuth
+// @Param actor_type query string false "Loại actor"
+// @Param actor_id query string false "ID actor"
+// @Param organization_id query string false "ID Organization"
+// @Param action query string false "Hành động"
+// @Param resource_type query string false "Loại tài nguyên"
+// @Param page query int false "Trang"
+// @Param limit query int false "Số lượng mỗi trang"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/audit-logs [get]
 func (h *Handler) List(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 20)
