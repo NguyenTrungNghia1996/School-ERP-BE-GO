@@ -1,6 +1,6 @@
 services:
   app:
-    build: .
+    image: trungnghia1996/school-erp-be-go:latest
     container_name: school-erp-app
     restart: unless-stopped
     ports:
