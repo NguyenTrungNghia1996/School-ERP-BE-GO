@@ -26,7 +26,9 @@ func NewHandler(service *Service) *Handler {
 // @Param resource_type query string false "Loại tài nguyên"
 // @Param page query int false "Trang"
 // @Param limit query int false "Số lượng mỗi trang"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessListResponse{data=[]AuditLog}
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
 // @Router /v1/platform/audit-logs [get]
 func (h *Handler) List(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)

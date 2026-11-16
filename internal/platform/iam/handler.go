@@ -38,7 +38,9 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 // @Param role_id query string false "Lọc theo Role ID"
 // @Param page query int false "Trang"
 // @Param limit query int false "Số lượng mỗi trang"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessListResponse{data=[]PlatformUser}
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
 // @Router /v1/platform/users [get]
 func (h *Handler) ListUsers(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -73,7 +75,9 @@ func (h *Handler) ListUsers(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body CreateUserInput true "Thông tin nhân sự"
-// @Success 201 {object} map[string]any
+// @Success 201 {object} response.SuccessResponse{data=PlatformUser}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/users [post]
 func (h *Handler) CreateUser(c *fiber.Ctx) error {
 	var body CreateUserInput
@@ -110,7 +114,10 @@ func (h *Handler) CreateUser(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param id path string true "User ID"
 // @Param body body map[string][]string true "role_ids"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 422 {object} response.ErrorResponse
 // @Router /v1/platform/users/{id}/roles [put]
 func (h *Handler) UpdateUserRoles(c *fiber.Ctx) error {
 	targetID, err := uuid.Parse(c.Params("id"))
@@ -151,7 +158,10 @@ func (h *Handler) UpdateUserRoles(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param id path string true "User ID"
 // @Param body body map[string]string true "status, reason"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 422 {object} response.ErrorResponse
 // @Router /v1/platform/users/{id}/status [patch]
 func (h *Handler) UpdateUserStatus(c *fiber.Ctx) error {
 	targetID, err := uuid.Parse(c.Params("id"))
@@ -197,7 +207,8 @@ func (h *Handler) UpdateUserStatus(c *fiber.Ctx) error {
 // @Tags Platform IAM
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=[]RoleWithSummary}
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/roles [get]
 func (h *Handler) ListRoles(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -216,7 +227,8 @@ func (h *Handler) ListRoles(c *fiber.Ctx) error {
 // @Tags Platform IAM
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=[]PlatformPermission}
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/permissions [get]
 func (h *Handler) ListPermissions(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -237,7 +249,9 @@ func (h *Handler) ListPermissions(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body CreateRoleInput true "Thông tin vai trò"
-// @Success 201 {object} map[string]any
+// @Success 201 {object} response.SuccessResponse{data=PlatformRole}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/roles [post]
 func (h *Handler) CreateRole(c *fiber.Ctx) error {
 	var body CreateRoleInput
@@ -274,7 +288,9 @@ func (h *Handler) CreateRole(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param id path string true "Role ID"
 // @Param body body map[string][]string true "permission_ids / permission_codes"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/platform/roles/{id}/permissions [put]
 func (h *Handler) UpdateRolePermissions(c *fiber.Ctx) error {
 	roleID, err := uuid.Parse(c.Params("id"))
@@ -316,7 +332,9 @@ func (h *Handler) UpdateRolePermissions(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param id path string true "User ID"
 // @Param body body map[string]any true "new_password, must_change_password, reason"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/platform/users/{id}/password [patch]
 func (h *Handler) ResetUserPassword(c *fiber.Ctx) error {
 	targetID, err := uuid.Parse(c.Params("id"))
@@ -367,7 +385,10 @@ func (h *Handler) ResetUserPassword(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param id path string true "User ID"
 // @Param body body map[string]string true "reason"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/users/{id}/mfa [delete]
 // @Router /v1/platform/users/{id}/mfa/disable [patch]
 func (h *Handler) ForceDisableUserMFA(c *fiber.Ctx) error {

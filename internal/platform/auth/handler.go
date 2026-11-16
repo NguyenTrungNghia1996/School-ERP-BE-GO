@@ -26,10 +26,10 @@ func NewHandler(service *Service) *Handler {
 // @Accept json
 // @Produce json
 // @Param body body LoginInput true "Thông tin đăng nhập"
-// @Success 200 {object} map[string]any
-// @Failure 400 {object} map[string]any
-// @Failure 401 {object} map[string]any
-// @Failure 403 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=LoginOutput}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
 // @Router /v1/platform/auth/login [post]
 func (h *Handler) Login(c *fiber.Ctx) error {
 	var body LoginInput
@@ -68,9 +68,9 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param body body map[string]string true "refresh_token"
-// @Success 200 {object} map[string]any
-// @Failure 400 {object} map[string]any
-// @Failure 401 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=LoginOutput}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/auth/refresh [post]
 func (h *Handler) Refresh(c *fiber.Ctx) error {
 	var body struct {
@@ -105,7 +105,8 @@ func (h *Handler) Refresh(c *fiber.Ctx) error {
 // @Tags Platform Auth
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/auth/logout [post]
 func (h *Handler) Logout(c *fiber.Ctx) error {
 	userID, _ := c.Locals("platform_user_id").(string)
@@ -126,7 +127,8 @@ func (h *Handler) Logout(c *fiber.Ctx) error {
 // @Tags Platform Auth
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=MeProfile}
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/me [get]
 func (h *Handler) Me(c *fiber.Ctx) error {
 	userID, _ := c.Locals("platform_user_id").(string)
@@ -155,7 +157,9 @@ func (h *Handler) Me(c *fiber.Ctx) error {
 // @Tags Platform Auth
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=MFASetupOutput}
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/me/mfa/setup [post]
 func (h *Handler) SetupMFA(c *fiber.Ctx) error {
 	userID, _ := c.Locals("platform_user_id").(string)
@@ -184,7 +188,10 @@ func (h *Handler) SetupMFA(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body map[string]string true "otp_code"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/me/mfa/enable [post]
 func (h *Handler) EnableMFA(c *fiber.Ctx) error {
 	userID, _ := c.Locals("platform_user_id").(string)
@@ -225,7 +232,10 @@ func (h *Handler) EnableMFA(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body map[string]string true "password, otp_code"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/me/mfa/disable [post]
 func (h *Handler) DisableMFA(c *fiber.Ctx) error {
 	userID, _ := c.Locals("platform_user_id").(string)
@@ -267,7 +277,9 @@ func (h *Handler) DisableMFA(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body map[string]string true "current_password, new_password"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/me/change-password [post]
 // @Router /v1/platform/me/password [patch]
 func (h *Handler) ChangePassword(c *fiber.Ctx) error {

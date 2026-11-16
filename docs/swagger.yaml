@@ -1,13 +1,110 @@
 basePath: /api
 definitions:
+  audit.AuditLog:
+    properties:
+      action:
+        type: string
+      actor_id:
+        type: string
+      actor_type:
+        type: string
+      after_data:
+        type: object
+      before_data:
+        type: object
+      created_at:
+        type: string
+      id:
+        type: string
+      ip_address:
+        type: string
+      organization_id:
+        type: string
+      reason:
+        type: string
+      resource_id:
+        type: string
+      resource_type:
+        type: string
+      school_id:
+        type: string
+      support_session_id:
+        type: string
+      user_agent:
+        type: string
+    type: object
   auth.LoginInput:
     properties:
       email:
+        example: admin@school-erp.vn
         type: string
       otp_code:
+        example: ""
         type: string
       password:
+        example: Admin@123456
         type: string
+    type: object
+  auth.LoginOutput:
+    properties:
+      access_token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      expires_in:
+        example: 900
+        type: integer
+      refresh_token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      token_type:
+        example: Bearer
+        type: string
+    type: object
+  auth.MFASetupOutput:
+    properties:
+      account:
+        example: admin@school-erp.vn
+        type: string
+      issuer:
+        example: School ERP
+        type: string
+      otpauth_url:
+        example: otpauth://totp/School%20ERP:admin@school-erp.vn?secret=JBSWY3DPEHPK3PXP&issuer=School%20ERP
+        type: string
+      secret:
+        example: JBSWY3DPEHPK3PXP
+        type: string
+    type: object
+  auth.MeProfile:
+    properties:
+      menus:
+        items:
+          $ref: '#/definitions/menu.AntDMenuNode'
+        type: array
+      permissions:
+        items:
+          type: string
+        type: array
+      roles:
+        items:
+          type: string
+        type: array
+      user:
+        additionalProperties: {}
+        type: object
+    type: object
+  billing.ActivePackageSummary:
+    properties:
+      expires_at:
+        type: string
+      package_code:
+        type: string
+      package_name:
+        type: string
+      subscription_id:
+        type: string
+      version_number:
+        type: integer
     type: object
   billing.CreatePackageInput:
     properties:
@@ -62,6 +159,69 @@ definitions:
       version_label:
         type: string
     type: object
+  billing.OrganizationEntitlement:
+    properties:
+      active_addons:
+        items:
+          $ref: '#/definitions/billing.ActivePackageSummary'
+        type: array
+      calculated_at:
+        type: string
+      effective_quotas:
+        additionalProperties:
+          format: int64
+          type: integer
+        type: object
+      enabled_features:
+        items:
+          type: string
+        type: array
+      nearest_expiry_at:
+        type: string
+      organization_id:
+        type: string
+      primary_package:
+        $ref: '#/definitions/billing.ActivePackageSummary'
+    type: object
+  billing.OrganizationSubscription:
+    properties:
+      assigned_by:
+        type: string
+      auto_renew:
+        type: boolean
+      created_at:
+        type: string
+      custom_quotas:
+        type: object
+      expires_at:
+        type: string
+      id:
+        type: string
+      notes:
+        type: string
+      organization_id:
+        type: string
+      package_version:
+        $ref: '#/definitions/billing.ServicePackageVersion'
+      package_version_id:
+        type: string
+      revoke_reason:
+        type: string
+      revoked_at:
+        type: string
+      revoked_by:
+        type: string
+      started_at:
+        type: string
+      status:
+        description: SCHEDULED | ACTIVE | SUSPENDED | EXPIRED | REVOKED
+        type: string
+      subscription_type:
+        description: PRIMARY | ADDON
+        type: string
+      updated_at:
+        type: string
+    type: object
   billing.RenewSubscriptionInput:
     properties:
       custom_quotas:
@@ -73,6 +233,104 @@ definitions:
         type: string
       package_version_id:
         type: string
+    type: object
+  billing.ServicePackage:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_public:
+        type: boolean
+      name:
+        type: string
+      package_type:
+        description: PRIMARY | ADDON
+        type: string
+      updated_at:
+        type: string
+      versions:
+        items:
+          $ref: '#/definitions/billing.ServicePackageVersion'
+        type: array
+    type: object
+  billing.ServicePackageVersion:
+    properties:
+      base_price:
+        type: number
+      billing_cycle:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      features:
+        items:
+          $ref: '#/definitions/catalog.Feature'
+        type: array
+      id:
+        type: string
+      package:
+        $ref: '#/definitions/billing.ServicePackage'
+      package_id:
+        type: string
+      published_at:
+        type: string
+      published_by:
+        type: string
+      quotas:
+        type: object
+      release_notes:
+        type: string
+      status:
+        description: DRAFT | PUBLISHED | DEPRECATED
+        type: string
+      updated_at:
+        type: string
+      version_label:
+        type: string
+      version_number:
+        type: integer
+    type: object
+  billing.ServicePackageWithSummary:
+    properties:
+      active_org_count:
+        type: integer
+      code:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_public:
+        type: boolean
+      latest_published_version:
+        $ref: '#/definitions/billing.ServicePackageVersion'
+      name:
+        type: string
+      package_type:
+        description: PRIMARY | ADDON
+        type: string
+      updated_at:
+        type: string
+      versions:
+        items:
+          $ref: '#/definitions/billing.ServicePackageVersion'
+        type: array
     type: object
   billing.SwitchPrimaryInput:
     properties:
@@ -175,6 +433,27 @@ definitions:
       resource:
         type: string
     type: object
+  catalog.Feature:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_core:
+        type: boolean
+      module:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
   catalog.ReorderMenuItem:
     properties:
       id:
@@ -183,6 +462,136 @@ definitions:
         type: string
       sort_order:
         type: integer
+    type: object
+  catalog.TenantBaseMenu:
+    properties:
+      created_at:
+        type: string
+      feature:
+        $ref: '#/definitions/catalog.Feature'
+      feature_id:
+        type: string
+      icon:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_mandatory:
+        type: boolean
+      label:
+        type: string
+      menu_key:
+        type: string
+      menu_type:
+        type: string
+      parent_id:
+        type: string
+      permission_match_mode:
+        type: string
+      required_permissions:
+        items:
+          type: string
+        type: array
+      route:
+        $ref: '#/definitions/catalog.TenantRoute'
+      route_id:
+        type: string
+      sort_order:
+        type: integer
+      target_portals:
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+    type: object
+  catalog.TenantMenuTreeNode:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/catalog.TenantMenuTreeNode'
+        type: array
+      feature_code:
+        type: string
+      feature_id:
+        type: string
+      icon:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_mandatory:
+        type: boolean
+      key:
+        type: string
+      label:
+        type: string
+      parent_id:
+        type: string
+      path:
+        type: string
+      permission_match_mode:
+        type: string
+      required_permissions:
+        items:
+          type: string
+        type: array
+      route_id:
+        type: string
+      sort_order:
+        type: integer
+      target_portals:
+        items:
+          type: string
+        type: array
+      type:
+        type: string
+    type: object
+  catalog.TenantPermission:
+    properties:
+      action:
+        type: string
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      feature:
+        $ref: '#/definitions/catalog.Feature'
+      feature_id:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_sensitive:
+        type: boolean
+      name:
+        type: string
+      resource:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  catalog.TenantRoute:
+    properties:
+      created_at:
+        type: string
+      feature_id:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      path:
+        type: string
+      route_key:
+        type: string
     type: object
   catalog.UpdateFeatureInput:
     properties:
@@ -236,6 +645,180 @@ definitions:
           type: string
         type: array
     type: object
+  iam.PlatformPermission:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      module:
+        type: string
+      name:
+        type: string
+    type: object
+  iam.PlatformRole:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_system:
+        type: boolean
+      name:
+        type: string
+      permissions:
+        items:
+          $ref: '#/definitions/iam.PlatformPermission'
+        type: array
+      updated_at:
+        type: string
+    type: object
+  iam.PlatformUser:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: string
+      last_login_at:
+        type: string
+      mfa_enabled:
+        type: boolean
+      must_change_password:
+        type: boolean
+      phone:
+        type: string
+      roles:
+        items:
+          $ref: '#/definitions/iam.PlatformRole'
+        type: array
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  iam.RoleWithSummary:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_system:
+        type: boolean
+      name:
+        type: string
+      permission_codes:
+        items:
+          type: string
+        type: array
+      permissions:
+        items:
+          $ref: '#/definitions/iam.PlatformPermission'
+        type: array
+      updated_at:
+        type: string
+      user_count:
+        type: integer
+    type: object
+  menu.AntDMenuNode:
+    properties:
+      badge_key:
+        type: string
+      children:
+        items:
+          $ref: '#/definitions/menu.AntDMenuNode'
+        type: array
+      hidden:
+        type: boolean
+      icon:
+        type: string
+      id:
+        type: string
+      key:
+        type: string
+      label:
+        type: string
+      path:
+        type: string
+      required_permission_code:
+        type: string
+      sort_order:
+        type: integer
+      type:
+        type: string
+    type: object
+  response.ErrorBody:
+    properties:
+      code:
+        example: VALIDATION_FAILED
+        type: string
+      details: {}
+      message:
+        example: Dữ liệu đầu vào không hợp lệ
+        type: string
+    type: object
+  response.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/response.ErrorBody'
+      message:
+        example: Dữ liệu đầu vào không hợp lệ
+        type: string
+      success:
+        example: false
+        type: boolean
+    type: object
+  response.Meta:
+    properties:
+      limit:
+        example: 20
+        type: integer
+      page:
+        example: 1
+        type: integer
+      total:
+        example: 100
+        type: integer
+    type: object
+  response.SuccessListResponse:
+    properties:
+      data: {}
+      message:
+        example: Thành công
+        type: string
+      meta:
+        $ref: '#/definitions/response.Meta'
+      success:
+        example: true
+        type: boolean
+    type: object
+  response.SuccessResponse:
+    properties:
+      data: {}
+      message:
+        example: Thành công
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
   support.CreateSessionInput:
     properties:
       duration_minutes:
@@ -251,6 +834,43 @@ definitions:
       school_id:
         type: string
       session_type:
+        type: string
+    type: object
+  support.SupportAccessSession:
+    properties:
+      actor_platform_user_id:
+        type: string
+      approved_by:
+        type: string
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      granted_permissions:
+        items:
+          type: string
+        type: array
+      id:
+        type: string
+      organization_id:
+        type: string
+      reason:
+        type: string
+      revoke_reason:
+        type: string
+      revoked_at:
+        type: string
+      revoked_by:
+        type: string
+      school_id:
+        type: string
+      session_type:
+        description: READ_ONLY | READ_WRITE
+        type: string
+      started_at:
+        type: string
+      status:
+        description: PENDING | APPROVED | ACTIVE | EXPIRED | REVOKED | REJECTED
         type: string
     type: object
   tenant_mgmt.CreateOrganizationInput:
@@ -294,6 +914,126 @@ definitions:
       subdomain:
         type: string
       tax_code:
+        type: string
+    type: object
+  tenant_mgmt.Organization:
+    properties:
+      address:
+        type: string
+      approved_at:
+        type: string
+      approved_by:
+        type: string
+      cloudflare_dns_record_id:
+        type: string
+      code:
+        type: string
+      contact_email:
+        type: string
+      contact_phone:
+        type: string
+      created_at:
+        type: string
+      dns_last_error:
+        type: string
+      dns_status:
+        type: string
+      dns_synced_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      status:
+        type: string
+      status_reason:
+        type: string
+      subdomain:
+        type: string
+      tax_code:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  tenant_mgmt.OrganizationSubdomainHistory:
+    properties:
+      approved_by:
+        type: string
+      cleaned_up_at:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      new_subdomain:
+        type: string
+      old_cloudflare_record_id:
+        type: string
+      old_record_status:
+        type: string
+      old_subdomain:
+        type: string
+      organization_id:
+        type: string
+      reason:
+        type: string
+      redirect_until:
+        type: string
+    type: object
+  tenant_mgmt.OrganizationSummary:
+    properties:
+      address:
+        type: string
+      approved_at:
+        type: string
+      approved_by:
+        type: string
+      cloudflare_dns_record_id:
+        type: string
+      code:
+        type: string
+      contact_email:
+        type: string
+      contact_phone:
+        type: string
+      created_at:
+        type: string
+      dns_last_error:
+        type: string
+      dns_status:
+        type: string
+      dns_synced_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      primary_expires_at:
+        type: string
+      primary_package_name:
+        type: string
+      school_count:
+        type: integer
+      status:
+        type: string
+      status_reason:
+        type: string
+      subdomain:
+        type: string
+      tax_code:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  tenant_mgmt.ReservedSubdomain:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      keyword:
+        type: string
+      reason:
         type: string
     type: object
 info:
@@ -357,8 +1097,22 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessListResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/audit.AuditLog'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Truy vấn nhật ký kiểm toán (Audit Logs)
@@ -381,23 +1135,24 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.LoginOutput'
+              type: object
         "400":
           description: Bad Request
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Đăng nhập Platform Admin
       tags:
       - Platform Auth
@@ -409,8 +1164,11 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Đăng xuất Platform Admin
@@ -435,18 +1193,20 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.LoginOutput'
+              type: object
         "400":
           description: Bad Request
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Làm mới Access Token Platform
       tags:
       - Platform Auth
@@ -471,8 +1231,18 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/catalog.Feature'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Danh sách tính năng (Feature Catalog)
@@ -494,8 +1264,20 @@ paths:
         "201":
           description: Created
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/catalog.Feature'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo mới tính năng trong Catalog
@@ -523,8 +1305,24 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/catalog.Feature'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cập nhật tính năng trong Catalog
@@ -547,8 +1345,20 @@ paths:
         "201":
           description: Created
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/catalog.TenantBaseMenu'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo node mới trên cây menu nền của Tenant
@@ -573,8 +1383,11 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Sắp xếp lại cây menu nền của Tenant
@@ -588,8 +1401,18 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/catalog.TenantMenuTreeNode'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cây menu nền của Tenant (Base Menu Tree)
@@ -616,8 +1439,18 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/catalog.TenantPermission'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Danh sách quyền Tenant (Permission Catalog)
@@ -639,8 +1472,24 @@ paths:
         "201":
           description: Created
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/catalog.TenantPermission'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo mới quyền Tenant trong Catalog
@@ -668,8 +1517,24 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/catalog.TenantPermission'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cập nhật quyền Tenant trong Catalog
@@ -683,8 +1548,18 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/catalog.TenantRoute'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Danh sách Route của Tenant
@@ -698,8 +1573,16 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.MeProfile'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Thông tin tài khoản Platform hiện tại
@@ -724,8 +1607,15 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Đổi mật khẩu tài khoản hiện tại
@@ -750,8 +1640,19 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tắt MFA (TOTP) của tài khoản hiện tại
@@ -776,8 +1677,19 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Kích hoạt MFA (TOTP)
@@ -791,8 +1703,20 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.MFASetupOutput'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Khởi tạo khóa MFA (TOTP)
@@ -817,8 +1741,15 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Đổi mật khẩu tài khoản hiện tại
@@ -832,8 +1763,22 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/menu.AntDMenuNode'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy cây menu nền tảng (Platform Menu Tree)
@@ -868,8 +1813,18 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessListResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/tenant_mgmt.OrganizationSummary'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Danh sách Tổ chức (Organizations)
@@ -891,8 +1846,20 @@ paths:
         "201":
           description: Created
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/tenant_mgmt.Organization'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo mới Tổ chức (kèm trường đầu tiên và School Admin)
@@ -912,8 +1879,20 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/tenant_mgmt.Organization'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Chi tiết Tổ chức
@@ -933,8 +1912,24 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/tenant_mgmt.Organization'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Phê duyệt Tổ chức
@@ -963,8 +1958,24 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/tenant_mgmt.Organization'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Đổi Subdomain chính của Tổ chức
@@ -984,8 +1995,20 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/tenant_mgmt.Organization'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Thử lại đồng bộ bản ghi Cloudflare DNS cho Tổ chức
@@ -1015,8 +2038,20 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/tenant_mgmt.Organization'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cập nhật trạng thái Tổ chức (ACTIVE / SUSPENDED)
@@ -1036,8 +2071,16 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.OrganizationEntitlement'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tính toán Entitlement hiệu lực của Tổ chức
@@ -1057,8 +2100,18 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/billing.OrganizationSubscription'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Danh sách gói dịch vụ đã cấp cho Tổ chức
@@ -1085,8 +2138,28 @@ paths:
         "201":
           description: Created
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.OrganizationSubscription'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cấp gói dịch vụ (PRIMARY / ADDON) cho Tổ chức
@@ -1114,8 +2187,28 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.OrganizationSubscription'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Chuyển đổi gói chính (PRIMARY) của Tổ chức
@@ -1135,8 +2228,11 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Kiểm tra tính hợp lệ và khả dụng của Subdomain
@@ -1164,8 +2260,24 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.ServicePackageVersion'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cập nhật phiên bản gói dịch vụ (khi đang ở DRAFT)
@@ -1185,8 +2297,24 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.ServicePackageVersion'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Ngừng phát hành (DEPRECATE) phiên bản gói dịch vụ
@@ -1206,8 +2334,28 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.ServicePackageVersion'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Phát hành (PUBLISH) phiên bản gói dịch vụ
@@ -1226,8 +2374,18 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/billing.ServicePackageWithSummary'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Danh sách gói dịch vụ (PRIMARY / ADDON)
@@ -1249,8 +2407,20 @@ paths:
         "201":
           description: Created
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.ServicePackage'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo mới gói dịch vụ
@@ -1270,8 +2440,20 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.ServicePackage'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Chi tiết gói dịch vụ và các phiên bản
@@ -1299,8 +2481,20 @@ paths:
         "201":
           description: Created
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.ServicePackageVersion'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo phiên bản mới (DRAFT) cho gói dịch vụ
@@ -1314,8 +2508,18 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/iam.PlatformPermission'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Danh sách quyền nền tảng
@@ -1329,8 +2533,18 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/tenant_mgmt.ReservedSubdomain'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Danh sách từ khóa Subdomain bị giữ chỗ (Reserved)
@@ -1354,8 +2568,20 @@ paths:
         "201":
           description: Created
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/tenant_mgmt.ReservedSubdomain'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Thêm từ khóa Subdomain giữ chỗ
@@ -1369,8 +2595,18 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/iam.RoleWithSummary'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Danh sách vai trò nền tảng
@@ -1392,8 +2628,20 @@ paths:
         "201":
           description: Created
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/iam.PlatformRole'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo mới vai trò nền tảng
@@ -1425,8 +2673,15 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cập nhật quyền cho vai trò nền tảng
@@ -1446,8 +2701,20 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/tenant_mgmt.OrganizationSubdomainHistory'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Xóa bản ghi Cloudflare DNS của Subdomain cũ trong lịch sử Redirect
@@ -1475,8 +2742,28 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.OrganizationSubscription'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Gia hạn gói dịch vụ của Tổ chức
@@ -1506,8 +2793,20 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.OrganizationSubscription'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Thu hồi gói dịch vụ của Tổ chức
@@ -1537,8 +2836,20 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.OrganizationSubscription'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạm ngưng gói dịch vụ của Tổ chức
@@ -1569,8 +2880,18 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessListResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/support.SupportAccessSession'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Danh sách phiên hỗ trợ (Support Sessions)
@@ -1592,8 +2913,16 @@ paths:
         "201":
           description: Created
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/support.SupportAccessSession'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo yêu cầu phiên hỗ trợ (Support Mode)
@@ -1613,8 +2942,28 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/support.SupportAccessSession'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Phê duyệt phiên hỗ trợ (Four-Eyes)
@@ -1634,8 +2983,27 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Đổi token truy cập trường cho phiên hỗ trợ đã duyệt
@@ -1664,8 +3032,20 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/support.SupportAccessSession'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Thu hồi phiên hỗ trợ
@@ -1700,8 +3080,22 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessListResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/iam.PlatformUser'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Danh sách nhân sự nền tảng
@@ -1723,8 +3117,20 @@ paths:
         "201":
           description: Created
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/iam.PlatformUser'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo mới nhân sự nền tảng
@@ -1754,8 +3160,19 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tắt bắt buộc MFA của nhân sự nền tảng
@@ -1785,8 +3202,19 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tắt bắt buộc MFA của nhân sự nền tảng
@@ -1815,8 +3243,15 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Đặt lại mật khẩu nhân sự nền tảng
@@ -1848,8 +3283,19 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cập nhật vai trò nhân sự nền tảng
@@ -1879,8 +3325,19 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cập nhật trạng thái nhân sự nền tảng
@@ -1903,13 +3360,15 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Phân giải Subdomain của Tổ chức & Redirect 301/308 (Public)
       tags:
       - Public Tenant

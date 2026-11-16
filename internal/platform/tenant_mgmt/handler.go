@@ -38,7 +38,8 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 // @Param dns_status query string false "Trạng thái DNS"
 // @Param page query int false "Trang"
 // @Param limit query int false "Số lượng mỗi trang"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessListResponse{data=[]OrganizationSummary}
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/organizations [get]
 func (h *Handler) ListOrganizations(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -72,7 +73,9 @@ func (h *Handler) ListOrganizations(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Organization ID"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=Organization}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/platform/organizations/{id} [get]
 func (h *Handler) GetOrganization(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("id"))
@@ -101,7 +104,9 @@ func (h *Handler) GetOrganization(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body CreateOrganizationInput true "Thông tin khởi tạo Tổ chức"
-// @Success 201 {object} map[string]any
+// @Success 201 {object} response.SuccessResponse{data=Organization}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/organizations [post]
 func (h *Handler) CreateOrganization(c *fiber.Ctx) error {
 	var body CreateOrganizationInput
@@ -141,7 +146,10 @@ func (h *Handler) CreateOrganization(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Organization ID"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=Organization}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/organizations/{id}/approve [post]
 func (h *Handler) ApproveOrganization(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("id"))
@@ -175,7 +183,9 @@ func (h *Handler) ApproveOrganization(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param id path string true "Organization ID"
 // @Param body body map[string]string true "status, reason"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=Organization}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/platform/organizations/{id}/status [patch]
 func (h *Handler) UpdateOrganizationStatus(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("id"))
@@ -221,7 +231,10 @@ func (h *Handler) UpdateOrganizationStatus(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param id path string true "Organization ID"
 // @Param body body map[string]any true "new_subdomain, reason, redirect_until"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=Organization}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/organizations/{id}/change-subdomain [post]
 func (h *Handler) ChangeSubdomain(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("id"))
@@ -266,7 +279,8 @@ func (h *Handler) ChangeSubdomain(c *fiber.Ctx) error {
 // @Tags Platform Organizations
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=[]ReservedSubdomain}
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/reserved-subdomains [get]
 func (h *Handler) ListReservedSubdomains(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -287,7 +301,9 @@ func (h *Handler) ListReservedSubdomains(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body map[string]string true "keyword, reason"
-// @Success 201 {object} map[string]any
+// @Success 201 {object} response.SuccessResponse{data=ReservedSubdomain}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/reserved-subdomains [post]
 func (h *Handler) AddReservedSubdomain(c *fiber.Ctx) error {
 	var body struct {

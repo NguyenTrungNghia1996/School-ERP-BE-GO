@@ -17,7 +17,8 @@ import (
 // @Produce json
 // @Security BearerAuth
 // @Param subdomain query string true "Subdomain cần kiểm tra"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
 // @Router /v1/platform/organizations/check-subdomain [get]
 func (h *Handler) CheckSubdomain(c *fiber.Ctx) error {
 	subdomain := strings.TrimSpace(c.Query("subdomain"))
@@ -42,7 +43,9 @@ func (h *Handler) CheckSubdomain(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Organization ID"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=Organization}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/platform/organizations/{id}/dns/retry [post]
 func (h *Handler) RetryDNS(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("id"))
@@ -70,7 +73,9 @@ func (h *Handler) RetryDNS(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param history_id path string true "Subdomain History ID"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=OrganizationSubdomainHistory}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/platform/subdomain-histories/{history_id}/dns [delete]
 func (h *Handler) DeleteRedirectHistoryDNS(c *fiber.Ctx) error {
 	historyID, err := uuid.Parse(c.Params("history_id"))
@@ -98,8 +103,9 @@ func (h *Handler) DeleteRedirectHistoryDNS(c *fiber.Ctx) error {
 // @Produce json
 // @Param subdomain query string false "Subdomain cần phân giải"
 // @Param X-Tenant-Subdomain header string false "Subdomain qua Header"
-// @Success 200 {object} map[string]any
-// @Failure 404 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/public/tenant-resolve [get]
 func (h *Handler) PublicTenantResolve(c *fiber.Ctx) error {
 	subdomain := strings.TrimSpace(c.Query("subdomain"))

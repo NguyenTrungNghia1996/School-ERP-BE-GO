@@ -37,7 +37,8 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 // @Param organization_id query string false "Organization ID"
 // @Param page query int false "Trang"
 // @Param limit query int false "Số lượng mỗi trang"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessListResponse{data=[]SupportAccessSession}
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/support-sessions [get]
 func (h *Handler) ListSessions(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -70,7 +71,8 @@ func (h *Handler) ListSessions(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body CreateSessionInput true "Thông tin yêu cầu phiên hỗ trợ"
-// @Success 201 {object} map[string]any
+// @Success 201 {object} response.SuccessResponse{data=SupportAccessSession}
+// @Failure 400 {object} response.ErrorResponse
 // @Router /v1/platform/support-sessions [post]
 func (h *Handler) CreateSession(c *fiber.Ctx) error {
 	var body CreateSessionInput
@@ -103,7 +105,11 @@ func (h *Handler) CreateSession(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Session ID"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=SupportAccessSession}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/support-sessions/{id}/approve [post]
 func (h *Handler) ApproveSession(c *fiber.Ctx) error {
 	sessionID, err := uuid.Parse(c.Params("id"))
@@ -137,7 +143,12 @@ func (h *Handler) ApproveSession(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Session ID"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Failure 410 {object} response.ErrorResponse
 // @Router /v1/platform/support-sessions/{id}/exchange-token [post]
 func (h *Handler) ExchangeToken(c *fiber.Ctx) error {
 	sessionID, err := uuid.Parse(c.Params("id"))
@@ -175,7 +186,9 @@ func (h *Handler) ExchangeToken(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param id path string true "Session ID"
 // @Param body body map[string]string false "reason"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=SupportAccessSession}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/platform/support-sessions/{id}/revoke [post]
 func (h *Handler) RevokeSession(c *fiber.Ctx) error {
 	sessionID, err := uuid.Parse(c.Params("id"))
