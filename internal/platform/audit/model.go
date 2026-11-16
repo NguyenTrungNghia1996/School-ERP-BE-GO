@@ -17,8 +17,8 @@ type AuditLog struct {
 	Action           string          `json:"action" gorm:"column:action;type:varchar(100);not null"`
 	ResourceType     string          `json:"resource_type" gorm:"column:resource_type;type:varchar(60);not null"`
 	ResourceID       *uuid.UUID      `json:"resource_id" gorm:"column:resource_id;type:uuid"`
-	BeforeData       json.RawMessage `json:"before_data" gorm:"column:before_data;type:jsonb"`
-	AfterData        json.RawMessage `json:"after_data" gorm:"column:after_data;type:jsonb"`
+	BeforeData       json.RawMessage `json:"before_data" gorm:"column:before_data;type:jsonb" swaggertype:"object"`
+	AfterData        json.RawMessage `json:"after_data" gorm:"column:after_data;type:jsonb" swaggertype:"object"`
 	Reason           *string         `json:"reason" gorm:"column:reason;type:text"`
 	IPAddress        *string         `json:"ip_address" gorm:"column:ip_address;type:inet"`
 	UserAgent        *string         `json:"user_agent" gorm:"column:user_agent;type:text"`

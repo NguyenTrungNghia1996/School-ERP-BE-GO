@@ -29,20 +29,40 @@ const (
 )
 
 type Meta struct {
-	Page  int   `json:"page"`
-	Limit int   `json:"limit"`
-	Total int64 `json:"total"`
+	Page  int   `json:"page" example:"1"`
+	Limit int   `json:"limit" example:"20"`
+	Total int64 `json:"total" example:"100"`
 }
 
 type ErrorBody struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Code    string `json:"code" example:"VALIDATION_FAILED"`
+	Message string `json:"message" example:"Dữ liệu đầu vào không hợp lệ"`
 	Details any    `json:"details"`
+}
+
+type SuccessResponse struct {
+	Success bool   `json:"success" example:"true"`
+	Message string `json:"message" example:"Thành công"`
+	Data    any    `json:"data"`
+}
+
+type SuccessListResponse struct {
+	Success bool   `json:"success" example:"true"`
+	Message string `json:"message" example:"Thành công"`
+	Data    any    `json:"data"`
+	Meta    Meta   `json:"meta"`
+}
+
+type ErrorResponse struct {
+	Success bool      `json:"success" example:"false"`
+	Message string    `json:"message" example:"Dữ liệu đầu vào không hợp lệ"`
+	Error   ErrorBody `json:"error"`
 }
 
 func Success(c *fiber.Ctx, status int, data any) error {
 	return c.Status(status).JSON(fiber.Map{
 		"success": true,
+		"message": "Thành công",
 		"data":    data,
 	})
 }
@@ -50,6 +70,7 @@ func Success(c *fiber.Ctx, status int, data any) error {
 func SuccessWithMeta(c *fiber.Ctx, status int, data any, meta Meta) error {
 	return c.Status(status).JSON(fiber.Map{
 		"success": true,
+		"message": "Thành công",
 		"data":    data,
 		"meta":    meta,
 	})
@@ -58,6 +79,7 @@ func SuccessWithMeta(c *fiber.Ctx, status int, data any, meta Meta) error {
 func Error(c *fiber.Ctx, status int, code string, message string, details any) error {
 	return c.Status(status).JSON(fiber.Map{
 		"success": false,
+		"message": message,
 		"error": ErrorBody{
 			Code:    code,
 			Message: message,

@@ -34,7 +34,8 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 // @Produce json
 // @Security BearerAuth
 // @Param package_type query string false "Loại gói (PRIMARY, ADDON)"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=[]ServicePackageWithSummary}
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/packages [get]
 func (h *Handler) ListPackages(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -54,7 +55,9 @@ func (h *Handler) ListPackages(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Package ID"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=ServicePackage}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/platform/packages/{id} [get]
 func (h *Handler) GetPackage(c *fiber.Ctx) error {
 	pkgID, err := uuid.Parse(c.Params("id"))
@@ -83,7 +86,9 @@ func (h *Handler) GetPackage(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body CreatePackageInput true "Thông tin gói dịch vụ"
-// @Success 201 {object} map[string]any
+// @Success 201 {object} response.SuccessResponse{data=ServicePackage}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/packages [post]
 func (h *Handler) CreatePackage(c *fiber.Ctx) error {
 	var body CreatePackageInput
@@ -121,7 +126,9 @@ func (h *Handler) CreatePackage(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param id path string true "Package ID"
 // @Param body body CreateVersionInput true "Thông tin phiên bản"
-// @Success 201 {object} map[string]any
+// @Success 201 {object} response.SuccessResponse{data=ServicePackageVersion}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/platform/packages/{id}/versions [post]
 func (h *Handler) CreatePackageVersion(c *fiber.Ctx) error {
 	pkgID, err := uuid.Parse(c.Params("id"))
@@ -161,7 +168,10 @@ func (h *Handler) CreatePackageVersion(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param version_id path string true "Package Version ID"
 // @Param body body UpdateVersionInput true "Thông tin cập nhật"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=ServicePackageVersion}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/package-versions/{version_id} [put]
 func (h *Handler) UpdatePackageVersion(c *fiber.Ctx) error {
 	verID, err := uuid.Parse(c.Params("version_id", c.Params("id")))
@@ -203,7 +213,11 @@ func (h *Handler) UpdatePackageVersion(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param version_id path string true "Package Version ID"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=ServicePackageVersion}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Failure 422 {object} response.ErrorResponse
 // @Router /v1/platform/package-versions/{version_id}/publish [post]
 func (h *Handler) PublishPackageVersion(c *fiber.Ctx) error {
 	verID, err := uuid.Parse(c.Params("version_id", c.Params("id")))
@@ -237,7 +251,10 @@ func (h *Handler) PublishPackageVersion(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param version_id path string true "Package Version ID"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=ServicePackageVersion}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/package-versions/{version_id}/deprecate [post]
 func (h *Handler) DeprecatePackageVersion(c *fiber.Ctx) error {
 	verID, err := uuid.Parse(c.Params("version_id", c.Params("id")))
@@ -269,7 +286,8 @@ func (h *Handler) DeprecatePackageVersion(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param org_id path string true "Organization ID"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=[]OrganizationSubscription}
+// @Failure 400 {object} response.ErrorResponse
 // @Router /v1/platform/organizations/{org_id}/subscriptions [get]
 func (h *Handler) ListOrgSubscriptions(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("org_id"))
@@ -294,7 +312,8 @@ func (h *Handler) ListOrgSubscriptions(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param org_id path string true "Organization ID"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=OrganizationEntitlement}
+// @Failure 400 {object} response.ErrorResponse
 // @Router /v1/platform/organizations/{org_id}/entitlements [get]
 func (h *Handler) GetOrgEntitlements(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("org_id"))
@@ -321,7 +340,11 @@ func (h *Handler) GetOrgEntitlements(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param org_id path string true "Organization ID"
 // @Param body body CreateSubscriptionInput true "Thông tin cấp gói"
-// @Success 201 {object} map[string]any
+// @Success 201 {object} response.SuccessResponse{data=OrganizationSubscription}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Failure 422 {object} response.ErrorResponse
 // @Router /v1/platform/organizations/{org_id}/subscriptions [post]
 func (h *Handler) CreateSubscription(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("org_id"))
@@ -370,7 +393,11 @@ func (h *Handler) CreateSubscription(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param sub_id path string true "Subscription ID"
 // @Param body body RenewSubscriptionInput true "Thông tin gia hạn"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=OrganizationSubscription}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Failure 422 {object} response.ErrorResponse
 // @Router /v1/platform/subscriptions/{sub_id}/renew [post]
 func (h *Handler) RenewSubscription(c *fiber.Ctx) error {
 	subID, err := uuid.Parse(c.Params("sub_id", c.Params("id")))
@@ -416,7 +443,11 @@ func (h *Handler) RenewSubscription(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param org_id path string true "Organization ID"
 // @Param body body SwitchPrimaryInput true "Thông tin gói chính mới"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=OrganizationSubscription}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Failure 422 {object} response.ErrorResponse
 // @Router /v1/platform/organizations/{org_id}/switch-primary [post]
 func (h *Handler) SwitchPrimaryPackage(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("org_id"))
@@ -462,7 +493,9 @@ func (h *Handler) SwitchPrimaryPackage(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param sub_id path string true "Subscription ID"
 // @Param body body map[string]string true "reason"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=OrganizationSubscription}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/platform/subscriptions/{sub_id}/suspend [patch]
 func (h *Handler) SuspendSubscription(c *fiber.Ctx) error {
 	subID, err := uuid.Parse(c.Params("sub_id", c.Params("id")))
@@ -499,7 +532,9 @@ func (h *Handler) SuspendSubscription(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param sub_id path string true "Subscription ID"
 // @Param body body map[string]string true "reason"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=OrganizationSubscription}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/platform/subscriptions/{sub_id}/revoke [patch]
 func (h *Handler) RevokeSubscription(c *fiber.Ctx) error {
 	subID, err := uuid.Parse(c.Params("sub_id", c.Params("id")))

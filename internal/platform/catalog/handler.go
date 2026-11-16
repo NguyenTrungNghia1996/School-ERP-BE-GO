@@ -36,7 +36,8 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 // @Param module query string false "Module"
 // @Param is_active query string false "Trạng thái kích hoạt"
 // @Param search query string false "Tìm kiếm"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=[]Feature}
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/catalog/features [get]
 func (h *Handler) ListFeatures(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -61,7 +62,9 @@ func (h *Handler) ListFeatures(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body CreateFeatureInput true "Thông tin tính năng"
-// @Success 201 {object} map[string]any
+// @Success 201 {object} response.SuccessResponse{data=Feature}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/catalog/features [post]
 func (h *Handler) CreateFeature(c *fiber.Ctx) error {
 	var body CreateFeatureInput
@@ -102,7 +105,10 @@ func (h *Handler) CreateFeature(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param id path string true "Feature ID"
 // @Param body body UpdateFeatureInput true "Thông tin cập nhật"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=Feature}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 422 {object} response.ErrorResponse
 // @Router /v1/platform/catalog/features/{id} [put]
 func (h *Handler) UpdateFeature(c *fiber.Ctx) error {
 	featureID, err := uuid.Parse(c.Params("id"))
@@ -147,7 +153,8 @@ func (h *Handler) UpdateFeature(c *fiber.Ctx) error {
 // @Param feature_id query string false "Feature ID"
 // @Param resource query string false "Resource"
 // @Param is_sensitive query string false "Quyền nhạy cảm"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=[]TenantPermission}
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/catalog/permissions [get]
 func (h *Handler) ListPermissions(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -172,7 +179,10 @@ func (h *Handler) ListPermissions(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body CreatePermissionInput true "Thông tin quyền"
-// @Success 201 {object} map[string]any
+// @Success 201 {object} response.SuccessResponse{data=TenantPermission}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Router /v1/platform/catalog/permissions [post]
 func (h *Handler) CreatePermission(c *fiber.Ctx) error {
 	var body CreatePermissionInput
@@ -215,7 +225,10 @@ func (h *Handler) CreatePermission(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Param id path string true "Permission ID"
 // @Param body body UpdatePermissionInput true "Thông tin cập nhật"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=TenantPermission}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 422 {object} response.ErrorResponse
 // @Router /v1/platform/catalog/permissions/{id} [put]
 func (h *Handler) UpdatePermission(c *fiber.Ctx) error {
 	permID, err := uuid.Parse(c.Params("id"))
@@ -255,7 +268,8 @@ func (h *Handler) UpdatePermission(c *fiber.Ctx) error {
 // @Tags Platform Catalog
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=[]TenantRoute}
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/catalog/routes [get]
 func (h *Handler) ListRoutes(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -274,7 +288,8 @@ func (h *Handler) ListRoutes(c *fiber.Ctx) error {
 // @Tags Platform Catalog
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse{data=[]TenantMenuTreeNode}
+// @Failure 401 {object} response.ErrorResponse
 // @Router /v1/platform/catalog/menus/tree [get]
 func (h *Handler) GetMenuTree(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -295,7 +310,9 @@ func (h *Handler) GetMenuTree(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body CreateMenuInput true "Thông tin node menu"
-// @Success 201 {object} map[string]any
+// @Success 201 {object} response.SuccessResponse{data=TenantBaseMenu}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
 // @Router /v1/platform/catalog/menus [post]
 func (h *Handler) CreateMenu(c *fiber.Ctx) error {
 	var body CreateMenuInput
@@ -335,7 +352,8 @@ func (h *Handler) CreateMenu(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param body body []ReorderMenuItem true "Danh sách thứ tự menu"
-// @Success 200 {object} map[string]any
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
 // @Router /v1/platform/catalog/menus/reorder [put]
 func (h *Handler) ReorderMenus(c *fiber.Ctx) error {
 	var body struct {

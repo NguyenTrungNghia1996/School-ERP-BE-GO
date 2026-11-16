@@ -42,7 +42,7 @@ type ServicePackageVersion struct {
 	BillingCycle  string            `json:"billing_cycle" gorm:"column:billing_cycle;type:varchar(20);not null;default:'YEARLY'"`
 	BasePrice     float64           `json:"base_price" gorm:"column:base_price;type:numeric(15,2);not null;default:0"`
 	Currency      string            `json:"currency" gorm:"column:currency;type:varchar(10);not null;default:'VND'"`
-	Quotas        json.RawMessage   `json:"quotas" gorm:"column:quotas;type:jsonb;not null;default:'{}'"`
+	Quotas        json.RawMessage   `json:"quotas" gorm:"column:quotas;type:jsonb;not null;default:'{}'" swaggertype:"object"`
 	ReleaseNotes  *string           `json:"release_notes" gorm:"column:release_notes;type:text"`
 	PublishedAt   *time.Time        `json:"published_at" gorm:"column:published_at"`
 	PublishedBy   *uuid.UUID        `json:"published_by" gorm:"column:published_by;type:uuid"`
@@ -58,7 +58,7 @@ func (ServicePackageVersion) TableName() string {
 type ServicePackageFeature struct {
 	PackageVersionID uuid.UUID       `json:"package_version_id" gorm:"column:package_version_id;type:uuid;primaryKey"`
 	FeatureID        uuid.UUID       `json:"feature_id" gorm:"column:feature_id;type:uuid;primaryKey"`
-	FeatureLimits    json.RawMessage `json:"feature_limits" gorm:"column:feature_limits;type:jsonb;not null;default:'{}'"`
+	FeatureLimits    json.RawMessage `json:"feature_limits" gorm:"column:feature_limits;type:jsonb;not null;default:'{}'" swaggertype:"object"`
 	CreatedAt        time.Time       `json:"created_at" gorm:"column:created_at"`
 }
 
@@ -75,7 +75,7 @@ type OrganizationSubscription struct {
 	Status           string                 `json:"status" gorm:"column:status;type:varchar(20);not null;default:'ACTIVE'"`    // SCHEDULED | ACTIVE | SUSPENDED | EXPIRED | REVOKED
 	StartedAt        time.Time              `json:"started_at" gorm:"column:started_at;not null"`
 	ExpiresAt        time.Time              `json:"expires_at" gorm:"column:expires_at;not null"`
-	CustomQuotas     json.RawMessage        `json:"custom_quotas" gorm:"column:custom_quotas;type:jsonb"`
+	CustomQuotas     json.RawMessage        `json:"custom_quotas" gorm:"column:custom_quotas;type:jsonb" swaggertype:"object"`
 	AutoRenew        bool                   `json:"auto_renew" gorm:"column:auto_renew;not null;default:false"`
 	Notes            *string                `json:"notes" gorm:"column:notes;type:text"`
 	AssignedBy       *uuid.UUID             `json:"assigned_by" gorm:"column:assigned_by;type:uuid"`

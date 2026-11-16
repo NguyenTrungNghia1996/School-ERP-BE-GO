@@ -14,7 +14,7 @@ type SupportAccessSession struct {
 	SchoolID            *uuid.UUID      `json:"school_id" gorm:"column:school_id;type:uuid"`
 	SessionType         string          `json:"session_type" gorm:"column:session_type;type:varchar(20);not null"` // READ_ONLY | READ_WRITE
 	Reason              string          `json:"reason" gorm:"column:reason;type:text;not null"`
-	GrantedPermissions  json.RawMessage `json:"granted_permissions" gorm:"column:granted_permissions;type:jsonb;not null;default:'[]'"`
+	GrantedPermissions  json.RawMessage `json:"granted_permissions" gorm:"column:granted_permissions;type:jsonb;not null;default:'[]'" swaggertype:"array,string"`
 	Status              string          `json:"status" gorm:"column:status;type:varchar(20);not null;default:'PENDING'"` // PENDING | APPROVED | ACTIVE | EXPIRED | REVOKED | REJECTED
 	ApprovedBy          *uuid.UUID      `json:"approved_by" gorm:"column:approved_by;type:uuid"`
 	StartedAt           *time.Time      `json:"started_at" gorm:"column:started_at"`

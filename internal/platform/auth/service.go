@@ -46,16 +46,16 @@ func NewService(db *gorm.DB, rdb *redis.Client, menuService *menu.Service, audit
 }
 
 type LoginInput struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	OTPCode  string `json:"otp_code"`
+	Email    string `json:"email" example:"admin@school-erp.vn"`
+	Password string `json:"password" example:"Admin@123456"`
+	OTPCode  string `json:"otp_code" example:""`
 }
 
 type LoginOutput struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	TokenType    string `json:"token_type"`
-	ExpiresIn    int    `json:"expires_in"`
+	AccessToken  string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	RefreshToken string `json:"refresh_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	TokenType    string `json:"token_type" example:"Bearer"`
+	ExpiresIn    int    `json:"expires_in" example:"900"`
 }
 
 func (s *Service) Login(ctx context.Context, input LoginInput) (*LoginOutput, error) {
@@ -223,10 +223,10 @@ func (s *Service) GetMe(ctx context.Context, userID string, permissions []string
 }
 
 type MFASetupOutput struct {
-	Secret     string `json:"secret"`
-	OTPAuthURL string `json:"otpauth_url"`
-	Issuer     string `json:"issuer"`
-	Account    string `json:"account"`
+	Secret     string `json:"secret" example:"JBSWY3DPEHPK3PXP"`
+	OTPAuthURL string `json:"otpauth_url" example:"otpauth://totp/School%20ERP:admin@school-erp.vn?secret=JBSWY3DPEHPK3PXP&issuer=School%20ERP"`
+	Issuer     string `json:"issuer" example:"School ERP"`
+	Account    string `json:"account" example:"admin@school-erp.vn"`
 }
 
 // SetupMFA generates a new TOTP secret and returns the otpauth:// URL for QR code rendering.
