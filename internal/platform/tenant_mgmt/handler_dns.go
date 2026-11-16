@@ -11,7 +11,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// CheckSubdomain handles GET /api/v1/platform/organizations/check-subdomain?subdomain=abc
+// CheckSubdomain godoc
+// @Summary Kiểm tra tính hợp lệ và khả dụng của Subdomain
+// @Tags Platform Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param subdomain query string true "Subdomain cần kiểm tra"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/organizations/check-subdomain [get]
 func (h *Handler) CheckSubdomain(c *fiber.Ctx) error {
 	subdomain := strings.TrimSpace(c.Query("subdomain"))
 	if subdomain == "" {
@@ -29,7 +36,14 @@ func (h *Handler) CheckSubdomain(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, res)
 }
 
-// RetryDNS handles POST /api/v1/platform/organizations/:id/dns/retry
+// RetryDNS godoc
+// @Summary Thử lại đồng bộ bản ghi Cloudflare DNS cho Tổ chức
+// @Tags Platform Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/organizations/{id}/dns/retry [post]
 func (h *Handler) RetryDNS(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -50,7 +64,14 @@ func (h *Handler) RetryDNS(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, org)
 }
 
-// DeleteRedirectHistoryDNS handles DELETE /api/v1/platform/subdomain-histories/:history_id/dns
+// DeleteRedirectHistoryDNS godoc
+// @Summary Xóa bản ghi Cloudflare DNS của Subdomain cũ trong lịch sử Redirect
+// @Tags Platform Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param history_id path string true "Subdomain History ID"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/subdomain-histories/{history_id}/dns [delete]
 func (h *Handler) DeleteRedirectHistoryDNS(c *fiber.Ctx) error {
 	historyID, err := uuid.Parse(c.Params("history_id"))
 	if err != nil {
@@ -71,7 +92,15 @@ func (h *Handler) DeleteRedirectHistoryDNS(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, history)
 }
 
-// PublicTenantResolve handles GET /api/v1/public/tenant-resolve?subdomain=abc
+// PublicTenantResolve godoc
+// @Summary Phân giải Subdomain của Tổ chức & Redirect 301/308 (Public)
+// @Tags Public Tenant
+// @Produce json
+// @Param subdomain query string false "Subdomain cần phân giải"
+// @Param X-Tenant-Subdomain header string false "Subdomain qua Header"
+// @Success 200 {object} map[string]any
+// @Failure 404 {object} map[string]any
+// @Router /v1/public/tenant-resolve [get]
 func (h *Handler) PublicTenantResolve(c *fiber.Ctx) error {
 	subdomain := strings.TrimSpace(c.Query("subdomain"))
 	if subdomain == "" {

@@ -28,6 +28,14 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 	return uuid.Nil
 }
 
+// ListPackages godoc
+// @Summary Danh sách gói dịch vụ (PRIMARY / ADDON)
+// @Tags Platform Billing
+// @Produce json
+// @Security BearerAuth
+// @Param package_type query string false "Loại gói (PRIMARY, ADDON)"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/packages [get]
 func (h *Handler) ListPackages(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -40,6 +48,14 @@ func (h *Handler) ListPackages(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, pkgs)
 }
 
+// GetPackage godoc
+// @Summary Chi tiết gói dịch vụ và các phiên bản
+// @Tags Platform Billing
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Package ID"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/packages/{id} [get]
 func (h *Handler) GetPackage(c *fiber.Ctx) error {
 	pkgID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -60,6 +76,15 @@ func (h *Handler) GetPackage(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, pkg)
 }
 
+// CreatePackage godoc
+// @Summary Tạo mới gói dịch vụ
+// @Tags Platform Billing
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body CreatePackageInput true "Thông tin gói dịch vụ"
+// @Success 201 {object} map[string]any
+// @Router /v1/platform/packages [post]
 func (h *Handler) CreatePackage(c *fiber.Ctx) error {
 	var body CreatePackageInput
 	if err := c.BodyParser(&body); err != nil {
@@ -88,6 +113,16 @@ func (h *Handler) CreatePackage(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, pkg)
 }
 
+// CreatePackageVersion godoc
+// @Summary Tạo phiên bản mới (DRAFT) cho gói dịch vụ
+// @Tags Platform Billing
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Package ID"
+// @Param body body CreateVersionInput true "Thông tin phiên bản"
+// @Success 201 {object} map[string]any
+// @Router /v1/platform/packages/{id}/versions [post]
 func (h *Handler) CreatePackageVersion(c *fiber.Ctx) error {
 	pkgID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -118,6 +153,16 @@ func (h *Handler) CreatePackageVersion(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, ver)
 }
 
+// UpdatePackageVersion godoc
+// @Summary Cập nhật phiên bản gói dịch vụ (khi đang ở DRAFT)
+// @Tags Platform Billing
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param version_id path string true "Package Version ID"
+// @Param body body UpdateVersionInput true "Thông tin cập nhật"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/package-versions/{version_id} [put]
 func (h *Handler) UpdatePackageVersion(c *fiber.Ctx) error {
 	verID, err := uuid.Parse(c.Params("version_id", c.Params("id")))
 	if err != nil {
@@ -152,6 +197,14 @@ func (h *Handler) UpdatePackageVersion(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, ver)
 }
 
+// PublishPackageVersion godoc
+// @Summary Phát hành (PUBLISH) phiên bản gói dịch vụ
+// @Tags Platform Billing
+// @Produce json
+// @Security BearerAuth
+// @Param version_id path string true "Package Version ID"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/package-versions/{version_id}/publish [post]
 func (h *Handler) PublishPackageVersion(c *fiber.Ctx) error {
 	verID, err := uuid.Parse(c.Params("version_id", c.Params("id")))
 	if err != nil {
@@ -178,6 +231,14 @@ func (h *Handler) PublishPackageVersion(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, ver)
 }
 
+// DeprecatePackageVersion godoc
+// @Summary Ngừng phát hành (DEPRECATE) phiên bản gói dịch vụ
+// @Tags Platform Billing
+// @Produce json
+// @Security BearerAuth
+// @Param version_id path string true "Package Version ID"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/package-versions/{version_id}/deprecate [post]
 func (h *Handler) DeprecatePackageVersion(c *fiber.Ctx) error {
 	verID, err := uuid.Parse(c.Params("version_id", c.Params("id")))
 	if err != nil {
@@ -202,6 +263,14 @@ func (h *Handler) DeprecatePackageVersion(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, ver)
 }
 
+// ListOrgSubscriptions godoc
+// @Summary Danh sách gói dịch vụ đã cấp cho Tổ chức
+// @Tags Platform Billing
+// @Produce json
+// @Security BearerAuth
+// @Param org_id path string true "Organization ID"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/organizations/{org_id}/subscriptions [get]
 func (h *Handler) ListOrgSubscriptions(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("org_id"))
 	if err != nil {
@@ -219,6 +288,14 @@ func (h *Handler) ListOrgSubscriptions(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, subs)
 }
 
+// GetOrgEntitlements godoc
+// @Summary Tính toán Entitlement hiệu lực của Tổ chức
+// @Tags Platform Billing
+// @Produce json
+// @Security BearerAuth
+// @Param org_id path string true "Organization ID"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/organizations/{org_id}/entitlements [get]
 func (h *Handler) GetOrgEntitlements(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("org_id"))
 	if err != nil {
@@ -236,6 +313,16 @@ func (h *Handler) GetOrgEntitlements(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, ent)
 }
 
+// CreateSubscription godoc
+// @Summary Cấp gói dịch vụ (PRIMARY / ADDON) cho Tổ chức
+// @Tags Platform Billing
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param org_id path string true "Organization ID"
+// @Param body body CreateSubscriptionInput true "Thông tin cấp gói"
+// @Success 201 {object} map[string]any
+// @Router /v1/platform/organizations/{org_id}/subscriptions [post]
 func (h *Handler) CreateSubscription(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("org_id"))
 	if err != nil {
@@ -275,6 +362,16 @@ func (h *Handler) CreateSubscription(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, sub)
 }
 
+// RenewSubscription godoc
+// @Summary Gia hạn gói dịch vụ của Tổ chức
+// @Tags Platform Billing
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param sub_id path string true "Subscription ID"
+// @Param body body RenewSubscriptionInput true "Thông tin gia hạn"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/subscriptions/{sub_id}/renew [post]
 func (h *Handler) RenewSubscription(c *fiber.Ctx) error {
 	subID, err := uuid.Parse(c.Params("sub_id", c.Params("id")))
 	if err != nil {
@@ -311,6 +408,16 @@ func (h *Handler) RenewSubscription(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, sub)
 }
 
+// SwitchPrimaryPackage godoc
+// @Summary Chuyển đổi gói chính (PRIMARY) của Tổ chức
+// @Tags Platform Billing
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param org_id path string true "Organization ID"
+// @Param body body SwitchPrimaryInput true "Thông tin gói chính mới"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/organizations/{org_id}/switch-primary [post]
 func (h *Handler) SwitchPrimaryPackage(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("org_id"))
 	if err != nil {
@@ -347,6 +454,16 @@ func (h *Handler) SwitchPrimaryPackage(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, sub)
 }
 
+// SuspendSubscription godoc
+// @Summary Tạm ngưng gói dịch vụ của Tổ chức
+// @Tags Platform Billing
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param sub_id path string true "Subscription ID"
+// @Param body body map[string]string true "reason"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/subscriptions/{sub_id}/suspend [patch]
 func (h *Handler) SuspendSubscription(c *fiber.Ctx) error {
 	subID, err := uuid.Parse(c.Params("sub_id", c.Params("id")))
 	if err != nil {
@@ -374,6 +491,16 @@ func (h *Handler) SuspendSubscription(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, sub)
 }
 
+// RevokeSubscription godoc
+// @Summary Thu hồi gói dịch vụ của Tổ chức
+// @Tags Platform Billing
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param sub_id path string true "Subscription ID"
+// @Param body body map[string]string true "reason"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/subscriptions/{sub_id}/revoke [patch]
 func (h *Handler) RevokeSubscription(c *fiber.Ctx) error {
 	subID, err := uuid.Parse(c.Params("sub_id", c.Params("id")))
 	if err != nil {

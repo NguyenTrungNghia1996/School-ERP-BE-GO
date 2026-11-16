@@ -28,6 +28,18 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 	return uuid.Nil
 }
 
+// ListOrganizations godoc
+// @Summary Danh sách Tổ chức (Organizations)
+// @Tags Platform Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param search query string false "Tìm kiếm"
+// @Param status query string false "Trạng thái"
+// @Param dns_status query string false "Trạng thái DNS"
+// @Param page query int false "Trang"
+// @Param limit query int false "Số lượng mỗi trang"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/organizations [get]
 func (h *Handler) ListOrganizations(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -54,6 +66,14 @@ func (h *Handler) ListOrganizations(c *fiber.Ctx) error {
 	})
 }
 
+// GetOrganization godoc
+// @Summary Chi tiết Tổ chức
+// @Tags Platform Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/organizations/{id} [get]
 func (h *Handler) GetOrganization(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -74,6 +94,15 @@ func (h *Handler) GetOrganization(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, detail)
 }
 
+// CreateOrganization godoc
+// @Summary Tạo mới Tổ chức (kèm trường đầu tiên và School Admin)
+// @Tags Platform Organizations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body CreateOrganizationInput true "Thông tin khởi tạo Tổ chức"
+// @Success 201 {object} map[string]any
+// @Router /v1/platform/organizations [post]
 func (h *Handler) CreateOrganization(c *fiber.Ctx) error {
 	var body CreateOrganizationInput
 	if err := c.BodyParser(&body); err != nil {
@@ -106,6 +135,14 @@ func (h *Handler) CreateOrganization(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, result)
 }
 
+// ApproveOrganization godoc
+// @Summary Phê duyệt Tổ chức
+// @Tags Platform Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/organizations/{id}/approve [post]
 func (h *Handler) ApproveOrganization(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -130,6 +167,16 @@ func (h *Handler) ApproveOrganization(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, org)
 }
 
+// UpdateOrganizationStatus godoc
+// @Summary Cập nhật trạng thái Tổ chức (ACTIVE / SUSPENDED)
+// @Tags Platform Organizations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Param body body map[string]string true "status, reason"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/organizations/{id}/status [patch]
 func (h *Handler) UpdateOrganizationStatus(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -166,6 +213,16 @@ func (h *Handler) UpdateOrganizationStatus(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, org)
 }
 
+// ChangeSubdomain godoc
+// @Summary Đổi Subdomain chính của Tổ chức
+// @Tags Platform Organizations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Param body body map[string]any true "new_subdomain, reason, redirect_until"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/organizations/{id}/change-subdomain [post]
 func (h *Handler) ChangeSubdomain(c *fiber.Ctx) error {
 	orgID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -204,6 +261,13 @@ func (h *Handler) ChangeSubdomain(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, org)
 }
 
+// ListReservedSubdomains godoc
+// @Summary Danh sách từ khóa Subdomain bị giữ chỗ (Reserved)
+// @Tags Platform Organizations
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/reserved-subdomains [get]
 func (h *Handler) ListReservedSubdomains(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -216,6 +280,15 @@ func (h *Handler) ListReservedSubdomains(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, items)
 }
 
+// AddReservedSubdomain godoc
+// @Summary Thêm từ khóa Subdomain giữ chỗ
+// @Tags Platform Organizations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body map[string]string true "keyword, reason"
+// @Success 201 {object} map[string]any
+// @Router /v1/platform/reserved-subdomains [post]
 func (h *Handler) AddReservedSubdomain(c *fiber.Ctx) error {
 	var body struct {
 		Keyword string `json:"keyword"`

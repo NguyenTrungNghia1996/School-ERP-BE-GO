@@ -20,6 +20,17 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
+// Login godoc
+// @Summary Đăng nhập Platform Admin
+// @Tags Platform Auth
+// @Accept json
+// @Produce json
+// @Param body body LoginInput true "Thông tin đăng nhập"
+// @Success 200 {object} map[string]any
+// @Failure 400 {object} map[string]any
+// @Failure 401 {object} map[string]any
+// @Failure 403 {object} map[string]any
+// @Router /v1/platform/auth/login [post]
 func (h *Handler) Login(c *fiber.Ctx) error {
 	var body LoginInput
 	if err := c.BodyParser(&body); err != nil {
@@ -51,6 +62,16 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, tokens)
 }
 
+// Refresh godoc
+// @Summary Làm mới Access Token Platform
+// @Tags Platform Auth
+// @Accept json
+// @Produce json
+// @Param body body map[string]string true "refresh_token"
+// @Success 200 {object} map[string]any
+// @Failure 400 {object} map[string]any
+// @Failure 401 {object} map[string]any
+// @Router /v1/platform/auth/refresh [post]
 func (h *Handler) Refresh(c *fiber.Ctx) error {
 	var body struct {
 		RefreshToken string `json:"refresh_token"`
@@ -79,6 +100,13 @@ func (h *Handler) Refresh(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, tokens)
 }
 
+// Logout godoc
+// @Summary Đăng xuất Platform Admin
+// @Tags Platform Auth
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/auth/logout [post]
 func (h *Handler) Logout(c *fiber.Ctx) error {
 	userID, _ := c.Locals("platform_user_id").(string)
 	jti, _ := c.Locals("platform_jti").(string)
@@ -93,6 +121,13 @@ func (h *Handler) Logout(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, fiber.Map{"logged_out": true})
 }
 
+// Me godoc
+// @Summary Thông tin tài khoản Platform hiện tại
+// @Tags Platform Auth
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/me [get]
 func (h *Handler) Me(c *fiber.Ctx) error {
 	userID, _ := c.Locals("platform_user_id").(string)
 	if userID == "" {
@@ -115,6 +150,13 @@ func (h *Handler) Me(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, profile)
 }
 
+// SetupMFA godoc
+// @Summary Khởi tạo khóa MFA (TOTP)
+// @Tags Platform Auth
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/me/mfa/setup [post]
 func (h *Handler) SetupMFA(c *fiber.Ctx) error {
 	userID, _ := c.Locals("platform_user_id").(string)
 	if userID == "" {
@@ -135,6 +177,15 @@ func (h *Handler) SetupMFA(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, res)
 }
 
+// EnableMFA godoc
+// @Summary Kích hoạt MFA (TOTP)
+// @Tags Platform Auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body map[string]string true "otp_code"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/me/mfa/enable [post]
 func (h *Handler) EnableMFA(c *fiber.Ctx) error {
 	userID, _ := c.Locals("platform_user_id").(string)
 	if userID == "" {
@@ -167,6 +218,15 @@ func (h *Handler) EnableMFA(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, fiber.Map{"mfa_enabled": true})
 }
 
+// DisableMFA godoc
+// @Summary Tắt MFA (TOTP) của tài khoản hiện tại
+// @Tags Platform Auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body map[string]string true "password, otp_code"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/me/mfa/disable [post]
 func (h *Handler) DisableMFA(c *fiber.Ctx) error {
 	userID, _ := c.Locals("platform_user_id").(string)
 	if userID == "" {
@@ -200,6 +260,16 @@ func (h *Handler) DisableMFA(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, fiber.Map{"mfa_enabled": false})
 }
 
+// ChangePassword godoc
+// @Summary Đổi mật khẩu tài khoản hiện tại
+// @Tags Platform Auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body map[string]string true "current_password, new_password"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/me/change-password [post]
+// @Router /v1/platform/me/password [patch]
 func (h *Handler) ChangePassword(c *fiber.Ctx) error {
 	userID, _ := c.Locals("platform_user_id").(string)
 	currentJTI, _ := c.Locals("platform_jti").(string)

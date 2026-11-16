@@ -28,6 +28,17 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 	return uuid.Nil
 }
 
+// ListSessions godoc
+// @Summary Danh sách phiên hỗ trợ (Support Sessions)
+// @Tags Platform Support
+// @Produce json
+// @Security BearerAuth
+// @Param status query string false "Trạng thái"
+// @Param organization_id query string false "Organization ID"
+// @Param page query int false "Trang"
+// @Param limit query int false "Số lượng mỗi trang"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/support-sessions [get]
 func (h *Handler) ListSessions(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -52,6 +63,15 @@ func (h *Handler) ListSessions(c *fiber.Ctx) error {
 	})
 }
 
+// CreateSession godoc
+// @Summary Tạo yêu cầu phiên hỗ trợ (Support Mode)
+// @Tags Platform Support
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body CreateSessionInput true "Thông tin yêu cầu phiên hỗ trợ"
+// @Success 201 {object} map[string]any
+// @Router /v1/platform/support-sessions [post]
 func (h *Handler) CreateSession(c *fiber.Ctx) error {
 	var body CreateSessionInput
 	if err := c.BodyParser(&body); err != nil {
@@ -77,6 +97,14 @@ func (h *Handler) CreateSession(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, session)
 }
 
+// ApproveSession godoc
+// @Summary Phê duyệt phiên hỗ trợ (Four-Eyes)
+// @Tags Platform Support
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Session ID"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/support-sessions/{id}/approve [post]
 func (h *Handler) ApproveSession(c *fiber.Ctx) error {
 	sessionID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -103,6 +131,14 @@ func (h *Handler) ApproveSession(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, session)
 }
 
+// ExchangeToken godoc
+// @Summary Đổi token truy cập trường cho phiên hỗ trợ đã duyệt
+// @Tags Platform Support
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Session ID"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/support-sessions/{id}/exchange-token [post]
 func (h *Handler) ExchangeToken(c *fiber.Ctx) error {
 	sessionID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -131,6 +167,16 @@ func (h *Handler) ExchangeToken(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, res)
 }
 
+// RevokeSession godoc
+// @Summary Thu hồi phiên hỗ trợ
+// @Tags Platform Support
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Session ID"
+// @Param body body map[string]string false "reason"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/support-sessions/{id}/revoke [post]
 func (h *Handler) RevokeSession(c *fiber.Ctx) error {
 	sessionID, err := uuid.Parse(c.Params("id"))
 	if err != nil {

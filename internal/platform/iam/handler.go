@@ -28,6 +28,18 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 	return uuid.Nil
 }
 
+// ListUsers godoc
+// @Summary Danh sách nhân sự nền tảng
+// @Tags Platform IAM
+// @Produce json
+// @Security BearerAuth
+// @Param search query string false "Tìm kiếm"
+// @Param status query string false "Trạng thái (ACTIVE, LOCKED, INACTIVE)"
+// @Param role_id query string false "Lọc theo Role ID"
+// @Param page query int false "Trang"
+// @Param limit query int false "Số lượng mỗi trang"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/users [get]
 func (h *Handler) ListUsers(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -54,6 +66,15 @@ func (h *Handler) ListUsers(c *fiber.Ctx) error {
 	})
 }
 
+// CreateUser godoc
+// @Summary Tạo mới nhân sự nền tảng
+// @Tags Platform IAM
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body CreateUserInput true "Thông tin nhân sự"
+// @Success 201 {object} map[string]any
+// @Router /v1/platform/users [post]
 func (h *Handler) CreateUser(c *fiber.Ctx) error {
 	var body CreateUserInput
 	if err := c.BodyParser(&body); err != nil {
@@ -81,6 +102,16 @@ func (h *Handler) CreateUser(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, user)
 }
 
+// UpdateUserRoles godoc
+// @Summary Cập nhật vai trò nhân sự nền tảng
+// @Tags Platform IAM
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param body body map[string][]string true "role_ids"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/users/{id}/roles [put]
 func (h *Handler) UpdateUserRoles(c *fiber.Ctx) error {
 	targetID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -112,6 +143,16 @@ func (h *Handler) UpdateUserRoles(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, fiber.Map{"user_id": targetID, "role_ids": body.RoleIDs})
 }
 
+// UpdateUserStatus godoc
+// @Summary Cập nhật trạng thái nhân sự nền tảng
+// @Tags Platform IAM
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param body body map[string]string true "status, reason"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/users/{id}/status [patch]
 func (h *Handler) UpdateUserStatus(c *fiber.Ctx) error {
 	targetID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -151,6 +192,13 @@ func (h *Handler) UpdateUserStatus(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, fiber.Map{"user_id": targetID, "status": status})
 }
 
+// ListRoles godoc
+// @Summary Danh sách vai trò nền tảng
+// @Tags Platform IAM
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/roles [get]
 func (h *Handler) ListRoles(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -163,6 +211,13 @@ func (h *Handler) ListRoles(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, roles)
 }
 
+// ListPermissions godoc
+// @Summary Danh sách quyền nền tảng
+// @Tags Platform IAM
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/permissions [get]
 func (h *Handler) ListPermissions(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -175,6 +230,15 @@ func (h *Handler) ListPermissions(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, perms)
 }
 
+// CreateRole godoc
+// @Summary Tạo mới vai trò nền tảng
+// @Tags Platform IAM
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body CreateRoleInput true "Thông tin vai trò"
+// @Success 201 {object} map[string]any
+// @Router /v1/platform/roles [post]
 func (h *Handler) CreateRole(c *fiber.Ctx) error {
 	var body CreateRoleInput
 	if err := c.BodyParser(&body); err != nil {
@@ -202,6 +266,16 @@ func (h *Handler) CreateRole(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, role)
 }
 
+// UpdateRolePermissions godoc
+// @Summary Cập nhật quyền cho vai trò nền tảng
+// @Tags Platform IAM
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Role ID"
+// @Param body body map[string][]string true "permission_ids / permission_codes"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/roles/{id}/permissions [put]
 func (h *Handler) UpdateRolePermissions(c *fiber.Ctx) error {
 	roleID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -234,6 +308,16 @@ func (h *Handler) UpdateRolePermissions(c *fiber.Ctx) error {
 	})
 }
 
+// ResetUserPassword godoc
+// @Summary Đặt lại mật khẩu nhân sự nền tảng
+// @Tags Platform IAM
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param body body map[string]any true "new_password, must_change_password, reason"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/users/{id}/password [patch]
 func (h *Handler) ResetUserPassword(c *fiber.Ctx) error {
 	targetID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -275,6 +359,17 @@ func (h *Handler) ResetUserPassword(c *fiber.Ctx) error {
 	})
 }
 
+// ForceDisableUserMFA godoc
+// @Summary Tắt bắt buộc MFA của nhân sự nền tảng
+// @Tags Platform IAM
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param body body map[string]string true "reason"
+// @Success 200 {object} map[string]any
+// @Router /v1/platform/users/{id}/mfa [delete]
+// @Router /v1/platform/users/{id}/mfa/disable [patch]
 func (h *Handler) ForceDisableUserMFA(c *fiber.Ctx) error {
 	targetID, err := uuid.Parse(c.Params("id"))
 	if err != nil {

@@ -1,4 +1,301 @@
 basePath: /api
+definitions:
+  auth.LoginInput:
+    properties:
+      email:
+        type: string
+      otp_code:
+        type: string
+      password:
+        type: string
+    type: object
+  billing.CreatePackageInput:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      is_active:
+        type: boolean
+      is_public:
+        type: boolean
+      name:
+        type: string
+      package_type:
+        type: string
+    type: object
+  billing.CreateSubscriptionInput:
+    properties:
+      auto_renew:
+        type: boolean
+      custom_quotas:
+        additionalProperties: {}
+        type: object
+      expires_at:
+        type: string
+      notes:
+        type: string
+      package_version_id:
+        type: string
+      started_at:
+        type: string
+    type: object
+  billing.CreateVersionInput:
+    properties:
+      base_price:
+        type: number
+      billing_cycle:
+        type: string
+      clone_from_version_id:
+        type: string
+      currency:
+        type: string
+      feature_ids:
+        items:
+          type: string
+        type: array
+      quotas:
+        additionalProperties: {}
+        type: object
+      release_notes:
+        type: string
+      version_label:
+        type: string
+    type: object
+  billing.RenewSubscriptionInput:
+    properties:
+      custom_quotas:
+        additionalProperties: {}
+        type: object
+      new_expires_at:
+        type: string
+      notes:
+        type: string
+      package_version_id:
+        type: string
+    type: object
+  billing.SwitchPrimaryInput:
+    properties:
+      custom_quotas:
+        additionalProperties: {}
+        type: object
+      new_expires_at:
+        type: string
+      notes:
+        type: string
+      package_version_id:
+        type: string
+      reason:
+        type: string
+    type: object
+  billing.UpdateVersionInput:
+    properties:
+      base_price:
+        type: number
+      billing_cycle:
+        type: string
+      currency:
+        type: string
+      feature_ids:
+        items:
+          type: string
+        type: array
+      quotas:
+        additionalProperties: {}
+        type: object
+      release_notes:
+        type: string
+      version_label:
+        type: string
+    type: object
+  catalog.CreateFeatureInput:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      is_active:
+        type: boolean
+      is_core:
+        type: boolean
+      module:
+        type: string
+      name:
+        type: string
+    type: object
+  catalog.CreateMenuInput:
+    properties:
+      feature_id:
+        type: string
+      icon:
+        type: string
+      is_active:
+        type: boolean
+      is_mandatory:
+        type: boolean
+      label:
+        type: string
+      menu_key:
+        type: string
+      menu_type:
+        type: string
+      parent_id:
+        type: string
+      permission_match_mode:
+        type: string
+      required_permissions:
+        items:
+          type: string
+        type: array
+      route_id:
+        type: string
+      sort_order:
+        type: integer
+      target_portals:
+        items:
+          type: string
+        type: array
+    type: object
+  catalog.CreatePermissionInput:
+    properties:
+      action:
+        type: string
+      code:
+        type: string
+      description:
+        type: string
+      feature_id:
+        type: string
+      is_active:
+        type: boolean
+      is_sensitive:
+        type: boolean
+      name:
+        type: string
+      resource:
+        type: string
+    type: object
+  catalog.ReorderMenuItem:
+    properties:
+      id:
+        type: string
+      parent_id:
+        type: string
+      sort_order:
+        type: integer
+    type: object
+  catalog.UpdateFeatureInput:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      is_active:
+        type: boolean
+      is_core:
+        type: boolean
+      module:
+        type: string
+      name:
+        type: string
+    type: object
+  catalog.UpdatePermissionInput:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      is_active:
+        type: boolean
+      is_sensitive:
+        type: boolean
+      name:
+        type: string
+    type: object
+  iam.CreateRoleInput:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+    type: object
+  iam.CreateUserInput:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+      role_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  support.CreateSessionInput:
+    properties:
+      duration_minutes:
+        type: integer
+      granted_permissions:
+        items:
+          type: string
+        type: array
+      organization_id:
+        type: string
+      reason:
+        type: string
+      school_id:
+        type: string
+      session_type:
+        type: string
+    type: object
+  tenant_mgmt.CreateOrganizationInput:
+    properties:
+      address:
+        type: string
+      admin:
+        properties:
+          email:
+            type: string
+          full_name:
+            type: string
+          password:
+            type: string
+          phone:
+            type: string
+        type: object
+      code:
+        type: string
+      contact_email:
+        type: string
+      contact_phone:
+        type: string
+      name:
+        type: string
+      school:
+        properties:
+          address:
+            type: string
+          code:
+            type: string
+          email:
+            type: string
+          level:
+            type: string
+          name:
+            type: string
+          phone:
+            type: string
+        type: object
+      subdomain:
+        type: string
+      tax_code:
+        type: string
+    type: object
 info:
   contact: {}
   description: REST API for School ERP
@@ -20,7 +317,1606 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      summary: Check API and database health
+      summary: Check API, database and Redis health
       tags:
       - Health
+  /v1/platform/audit-logs:
+    get:
+      parameters:
+      - description: Loại actor
+        in: query
+        name: actor_type
+        type: string
+      - description: ID actor
+        in: query
+        name: actor_id
+        type: string
+      - description: ID Organization
+        in: query
+        name: organization_id
+        type: string
+      - description: Hành động
+        in: query
+        name: action
+        type: string
+      - description: Loại tài nguyên
+        in: query
+        name: resource_type
+        type: string
+      - description: Trang
+        in: query
+        name: page
+        type: integer
+      - description: Số lượng mỗi trang
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Truy vấn nhật ký kiểm toán (Audit Logs)
+      tags:
+      - Platform Audit
+  /v1/platform/auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin đăng nhập
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LoginInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Đăng nhập Platform Admin
+      tags:
+      - Platform Auth
+  /v1/platform/auth/logout:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Đăng xuất Platform Admin
+      tags:
+      - Platform Auth
+  /v1/platform/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: refresh_token
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Làm mới Access Token Platform
+      tags:
+      - Platform Auth
+  /v1/platform/catalog/features:
+    get:
+      parameters:
+      - description: Module
+        in: query
+        name: module
+        type: string
+      - description: Trạng thái kích hoạt
+        in: query
+        name: is_active
+        type: string
+      - description: Tìm kiếm
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Danh sách tính năng (Feature Catalog)
+      tags:
+      - Platform Catalog
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin tính năng
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/catalog.CreateFeatureInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tạo mới tính năng trong Catalog
+      tags:
+      - Platform Catalog
+  /v1/platform/catalog/features/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Feature ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin cập nhật
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/catalog.UpdateFeatureInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cập nhật tính năng trong Catalog
+      tags:
+      - Platform Catalog
+  /v1/platform/catalog/menus:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin node menu
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/catalog.CreateMenuInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tạo node mới trên cây menu nền của Tenant
+      tags:
+      - Platform Catalog
+  /v1/platform/catalog/menus/reorder:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Danh sách thứ tự menu
+        in: body
+        name: body
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/catalog.ReorderMenuItem'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Sắp xếp lại cây menu nền của Tenant
+      tags:
+      - Platform Catalog
+  /v1/platform/catalog/menus/tree:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cây menu nền của Tenant (Base Menu Tree)
+      tags:
+      - Platform Catalog
+  /v1/platform/catalog/permissions:
+    get:
+      parameters:
+      - description: Feature ID
+        in: query
+        name: feature_id
+        type: string
+      - description: Resource
+        in: query
+        name: resource
+        type: string
+      - description: Quyền nhạy cảm
+        in: query
+        name: is_sensitive
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Danh sách quyền Tenant (Permission Catalog)
+      tags:
+      - Platform Catalog
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin quyền
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/catalog.CreatePermissionInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tạo mới quyền Tenant trong Catalog
+      tags:
+      - Platform Catalog
+  /v1/platform/catalog/permissions/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Permission ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin cập nhật
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/catalog.UpdatePermissionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cập nhật quyền Tenant trong Catalog
+      tags:
+      - Platform Catalog
+  /v1/platform/catalog/routes:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Danh sách Route của Tenant
+      tags:
+      - Platform Catalog
+  /v1/platform/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Thông tin tài khoản Platform hiện tại
+      tags:
+      - Platform Auth
+  /v1/platform/me/change-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: current_password, new_password
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Đổi mật khẩu tài khoản hiện tại
+      tags:
+      - Platform Auth
+  /v1/platform/me/mfa/disable:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: password, otp_code
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tắt MFA (TOTP) của tài khoản hiện tại
+      tags:
+      - Platform Auth
+  /v1/platform/me/mfa/enable:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: otp_code
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Kích hoạt MFA (TOTP)
+      tags:
+      - Platform Auth
+  /v1/platform/me/mfa/setup:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Khởi tạo khóa MFA (TOTP)
+      tags:
+      - Platform Auth
+  /v1/platform/me/password:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: current_password, new_password
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Đổi mật khẩu tài khoản hiện tại
+      tags:
+      - Platform Auth
+  /v1/platform/menus/tree:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Lấy cây menu nền tảng (Platform Menu Tree)
+      tags:
+      - Platform IAM
+  /v1/platform/organizations:
+    get:
+      parameters:
+      - description: Tìm kiếm
+        in: query
+        name: search
+        type: string
+      - description: Trạng thái
+        in: query
+        name: status
+        type: string
+      - description: Trạng thái DNS
+        in: query
+        name: dns_status
+        type: string
+      - description: Trang
+        in: query
+        name: page
+        type: integer
+      - description: Số lượng mỗi trang
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Danh sách Tổ chức (Organizations)
+      tags:
+      - Platform Organizations
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin khởi tạo Tổ chức
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tenant_mgmt.CreateOrganizationInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tạo mới Tổ chức (kèm trường đầu tiên và School Admin)
+      tags:
+      - Platform Organizations
+  /v1/platform/organizations/{id}:
+    get:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Chi tiết Tổ chức
+      tags:
+      - Platform Organizations
+  /v1/platform/organizations/{id}/approve:
+    post:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Phê duyệt Tổ chức
+      tags:
+      - Platform Organizations
+  /v1/platform/organizations/{id}/change-subdomain:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: new_subdomain, reason, redirect_until
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Đổi Subdomain chính của Tổ chức
+      tags:
+      - Platform Organizations
+  /v1/platform/organizations/{id}/dns/retry:
+    post:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Thử lại đồng bộ bản ghi Cloudflare DNS cho Tổ chức
+      tags:
+      - Platform Organizations
+  /v1/platform/organizations/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: status, reason
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cập nhật trạng thái Tổ chức (ACTIVE / SUSPENDED)
+      tags:
+      - Platform Organizations
+  /v1/platform/organizations/{org_id}/entitlements:
+    get:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tính toán Entitlement hiệu lực của Tổ chức
+      tags:
+      - Platform Billing
+  /v1/platform/organizations/{org_id}/subscriptions:
+    get:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Danh sách gói dịch vụ đã cấp cho Tổ chức
+      tags:
+      - Platform Billing
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      - description: Thông tin cấp gói
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/billing.CreateSubscriptionInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cấp gói dịch vụ (PRIMARY / ADDON) cho Tổ chức
+      tags:
+      - Platform Billing
+  /v1/platform/organizations/{org_id}/switch-primary:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      - description: Thông tin gói chính mới
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/billing.SwitchPrimaryInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Chuyển đổi gói chính (PRIMARY) của Tổ chức
+      tags:
+      - Platform Billing
+  /v1/platform/organizations/check-subdomain:
+    get:
+      parameters:
+      - description: Subdomain cần kiểm tra
+        in: query
+        name: subdomain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Kiểm tra tính hợp lệ và khả dụng của Subdomain
+      tags:
+      - Platform Organizations
+  /v1/platform/package-versions/{version_id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Package Version ID
+        in: path
+        name: version_id
+        required: true
+        type: string
+      - description: Thông tin cập nhật
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/billing.UpdateVersionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cập nhật phiên bản gói dịch vụ (khi đang ở DRAFT)
+      tags:
+      - Platform Billing
+  /v1/platform/package-versions/{version_id}/deprecate:
+    post:
+      parameters:
+      - description: Package Version ID
+        in: path
+        name: version_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Ngừng phát hành (DEPRECATE) phiên bản gói dịch vụ
+      tags:
+      - Platform Billing
+  /v1/platform/package-versions/{version_id}/publish:
+    post:
+      parameters:
+      - description: Package Version ID
+        in: path
+        name: version_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Phát hành (PUBLISH) phiên bản gói dịch vụ
+      tags:
+      - Platform Billing
+  /v1/platform/packages:
+    get:
+      parameters:
+      - description: Loại gói (PRIMARY, ADDON)
+        in: query
+        name: package_type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Danh sách gói dịch vụ (PRIMARY / ADDON)
+      tags:
+      - Platform Billing
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin gói dịch vụ
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/billing.CreatePackageInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tạo mới gói dịch vụ
+      tags:
+      - Platform Billing
+  /v1/platform/packages/{id}:
+    get:
+      parameters:
+      - description: Package ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Chi tiết gói dịch vụ và các phiên bản
+      tags:
+      - Platform Billing
+  /v1/platform/packages/{id}/versions:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Package ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin phiên bản
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/billing.CreateVersionInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tạo phiên bản mới (DRAFT) cho gói dịch vụ
+      tags:
+      - Platform Billing
+  /v1/platform/permissions:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Danh sách quyền nền tảng
+      tags:
+      - Platform IAM
+  /v1/platform/reserved-subdomains:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Danh sách từ khóa Subdomain bị giữ chỗ (Reserved)
+      tags:
+      - Platform Organizations
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: keyword, reason
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Thêm từ khóa Subdomain giữ chỗ
+      tags:
+      - Platform Organizations
+  /v1/platform/roles:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Danh sách vai trò nền tảng
+      tags:
+      - Platform IAM
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin vai trò
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/iam.CreateRoleInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tạo mới vai trò nền tảng
+      tags:
+      - Platform IAM
+  /v1/platform/roles/{id}/permissions:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: permission_ids / permission_codes
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cập nhật quyền cho vai trò nền tảng
+      tags:
+      - Platform IAM
+  /v1/platform/subdomain-histories/{history_id}/dns:
+    delete:
+      parameters:
+      - description: Subdomain History ID
+        in: path
+        name: history_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Xóa bản ghi Cloudflare DNS của Subdomain cũ trong lịch sử Redirect
+      tags:
+      - Platform Organizations
+  /v1/platform/subscriptions/{sub_id}/renew:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subscription ID
+        in: path
+        name: sub_id
+        required: true
+        type: string
+      - description: Thông tin gia hạn
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/billing.RenewSubscriptionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Gia hạn gói dịch vụ của Tổ chức
+      tags:
+      - Platform Billing
+  /v1/platform/subscriptions/{sub_id}/revoke:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subscription ID
+        in: path
+        name: sub_id
+        required: true
+        type: string
+      - description: reason
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Thu hồi gói dịch vụ của Tổ chức
+      tags:
+      - Platform Billing
+  /v1/platform/subscriptions/{sub_id}/suspend:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subscription ID
+        in: path
+        name: sub_id
+        required: true
+        type: string
+      - description: reason
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tạm ngưng gói dịch vụ của Tổ chức
+      tags:
+      - Platform Billing
+  /v1/platform/support-sessions:
+    get:
+      parameters:
+      - description: Trạng thái
+        in: query
+        name: status
+        type: string
+      - description: Organization ID
+        in: query
+        name: organization_id
+        type: string
+      - description: Trang
+        in: query
+        name: page
+        type: integer
+      - description: Số lượng mỗi trang
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Danh sách phiên hỗ trợ (Support Sessions)
+      tags:
+      - Platform Support
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin yêu cầu phiên hỗ trợ
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/support.CreateSessionInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tạo yêu cầu phiên hỗ trợ (Support Mode)
+      tags:
+      - Platform Support
+  /v1/platform/support-sessions/{id}/approve:
+    post:
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Phê duyệt phiên hỗ trợ (Four-Eyes)
+      tags:
+      - Platform Support
+  /v1/platform/support-sessions/{id}/exchange-token:
+    post:
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Đổi token truy cập trường cho phiên hỗ trợ đã duyệt
+      tags:
+      - Platform Support
+  /v1/platform/support-sessions/{id}/revoke:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: reason
+        in: body
+        name: body
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Thu hồi phiên hỗ trợ
+      tags:
+      - Platform Support
+  /v1/platform/users:
+    get:
+      parameters:
+      - description: Tìm kiếm
+        in: query
+        name: search
+        type: string
+      - description: Trạng thái (ACTIVE, LOCKED, INACTIVE)
+        in: query
+        name: status
+        type: string
+      - description: Lọc theo Role ID
+        in: query
+        name: role_id
+        type: string
+      - description: Trang
+        in: query
+        name: page
+        type: integer
+      - description: Số lượng mỗi trang
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Danh sách nhân sự nền tảng
+      tags:
+      - Platform IAM
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin nhân sự
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/iam.CreateUserInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tạo mới nhân sự nền tảng
+      tags:
+      - Platform IAM
+  /v1/platform/users/{id}/mfa:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: reason
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tắt bắt buộc MFA của nhân sự nền tảng
+      tags:
+      - Platform IAM
+  /v1/platform/users/{id}/mfa/disable:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: reason
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Tắt bắt buộc MFA của nhân sự nền tảng
+      tags:
+      - Platform IAM
+  /v1/platform/users/{id}/password:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: new_password, must_change_password, reason
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Đặt lại mật khẩu nhân sự nền tảng
+      tags:
+      - Platform IAM
+  /v1/platform/users/{id}/roles:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: role_ids
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cập nhật vai trò nhân sự nền tảng
+      tags:
+      - Platform IAM
+  /v1/platform/users/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: status, reason
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cập nhật trạng thái nhân sự nền tảng
+      tags:
+      - Platform IAM
+  /v1/public/tenant-resolve:
+    get:
+      parameters:
+      - description: Subdomain cần phân giải
+        in: query
+        name: subdomain
+        type: string
+      - description: Subdomain qua Header
+        in: header
+        name: X-Tenant-Subdomain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Phân giải Subdomain của Tổ chức & Redirect 301/308 (Public)
+      tags:
+      - Public Tenant
+securityDefinitions:
+  BearerAuth:
+    description: 'Nhập theo cú pháp: Bearer <token>'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
