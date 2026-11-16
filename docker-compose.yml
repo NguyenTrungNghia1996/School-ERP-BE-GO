@@ -10,12 +10,12 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: admin
-      DB_PASSWORD: trungnghia@123
+      DB_PASSWORD:
       DB_NAME: erp_db
       DB_SSLMODE: disable
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-      REDIS_PASSWORD: trungnghia@123
+      REDIS_PASSWORD:
       REDIS_DB: "0"
       PLATFORM_JWT_SECRET: school-erp
       PLATFORM_ROOT_EMAIL: admin@school-erp.vn
