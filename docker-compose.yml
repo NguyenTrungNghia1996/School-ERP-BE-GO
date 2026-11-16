@@ -4,9 +4,28 @@ services:
     container_name: school-erp-app
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:${PORT:-3000}"
-    env_file:
-      - .env
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: admin
+      DB_PASSWORD: trungnghia@123
+      DB_NAME: erp_db
+      DB_SSLMODE: disable
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: trungnghia@123
+      REDIS_DB: "0"
+      PLATFORM_JWT_SECRET: school-erp
+      PLATFORM_ROOT_EMAIL: admin@school-erp.vn
+      PLATFORM_ROOT_PASSWORD: Admin@123456
+      CLOUDFLARE_API_TOKEN:
+      CLOUDFLARE_ZONE_ID:
+      CLOUDFLARE_ROOT_DOMAIN: nghia196.qzz.io
+      CLOUDFLARE_TENANT_TARGET: tenant-ingress.nghia196.qzz.io
+      CLOUDFLARE_PROXIED: "true"
+      CLOUDFLARE_TTL: "1"
     depends_on:
       postgres:
         condition: service_healthy
@@ -18,15 +37,13 @@ services:
     container_name: school-erp-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
-    ports:
-      - "${DB_PORT:-5432}:5432"
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: trungnghia@123
+      POSTGRES_DB: erp_db
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d erp_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -35,17 +52,11 @@ services:
     image: redis:7-alpine
     container_name: school-erp-redis
     restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --requirepass trungnghia@123
     volumes:
-      - redis_data:/data
+      - ./data/redis:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "trungnghia@123", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-volumes:
-  postgres_data:
-  redis_data:
-
