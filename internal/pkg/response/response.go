@@ -26,6 +26,8 @@ const (
 	ErrCodeSystemRoleProtected        = "SYSTEM_ROLE_PROTECTED"
 	ErrCodePlatformEmailAlreadyExists = "PLATFORM_EMAIL_ALREADY_EXISTS"
 	ErrCodeRoleInUse                  = "ROLE_IN_USE"
+	ErrCodeStorageQuotaExceeded       = "STORAGE_QUOTA_EXCEEDED"
+	ErrCodeStorageNotConfigured       = "STORAGE_NOT_CONFIGURED"
 	ErrCodeValidationFailed           = "VALIDATION_FAILED"
 	ErrCodeNotFound                 = "RESOURCE_NOT_FOUND"
 	ErrCodeConflict                 = "RESOURCE_CONFLICT"

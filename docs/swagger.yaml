@@ -900,6 +900,72 @@ definitions:
         example: LOCKED
         type: string
     type: object
+  media.MediaFileURLOutput:
+    properties:
+      expires_in_seconds:
+        type: integer
+      file_id:
+        type: string
+      object_key:
+        type: string
+      url:
+        type: string
+    type: object
+  media.StorageUsageOutput:
+    properties:
+      file_count:
+        example: 3
+        type: integer
+      folder_prefix:
+        example: orgs/550e8400-e29b-41d4-a716-446655440000/
+        type: string
+      organization_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      quota_bytes:
+        example: 53687091200
+        type: integer
+      remaining_bytes:
+        example: 53686042624
+        type: integer
+      usage_percent:
+        example: 0.01
+        type: number
+      used_bytes:
+        example: 1048576
+        type: integer
+    type: object
+  media.StoredFile:
+    properties:
+      access_url:
+        type: string
+      bucket:
+        type: string
+      created_at:
+        type: string
+      folder:
+        type: string
+      id:
+        type: string
+      mime_type:
+        type: string
+      object_key:
+        type: string
+      organization_id:
+        type: string
+      original_name:
+        type: string
+      public_url:
+        type: string
+      school_id:
+        type: string
+      size_bytes:
+        type: integer
+      storage_provider:
+        type: string
+      uploaded_by:
+        type: string
+    type: object
   menu.AntDMenuNode:
     properties:
       badge_key:
@@ -2726,6 +2792,210 @@ paths:
       summary: Tính toán Entitlement hiệu lực của Tổ chức
       tags:
       - Platform Billing
+  /v1/platform/organizations/{org_id}/media:
+    get:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      - description: Lọc theo thư mục con
+        in: query
+        name: folder
+        type: string
+      - description: Trang
+        in: query
+        name: page
+        type: integer
+      - description: Số lượng mỗi trang
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessListResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/media.StoredFile'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Danh sách ảnh đã tải lên của Tổ chức
+      tags:
+      - Platform Media
+  /v1/platform/organizations/{org_id}/media/{file_id}:
+    delete:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      - description: File ID
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa ảnh khỏi S3/R2 và hoàn lại dung lượng vào DB của Tổ chức
+      tags:
+      - Platform Media
+  /v1/platform/organizations/{org_id}/media/{file_id}/url:
+    get:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      - description: File ID
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/media.MediaFileURLOutput'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy đường dẫn truy cập (Public hoặc Presigned URL) của tệp ảnh
+      tags:
+      - Platform Media
+  /v1/platform/organizations/{org_id}/media/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      - description: Tệp ảnh (JPEG, PNG, WEBP, GIF)
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: 'Thư mục con (VD: logos, avatars, students)'
+        in: formData
+        name: folder
+        type: string
+      - description: School ID (nếu tách theo trường)
+        in: formData
+        name: school_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/media.StoredFile'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload ảnh vào thư mục riêng của Tổ chức trên S3/R2 (kiểm tra hạn mức
+        DB)
+      tags:
+      - Platform Media
+  /v1/platform/organizations/{org_id}/storage/usage:
+    get:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/media.StorageUsageOutput'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Thống kê dung lượng lưu trữ ảnh của Tổ chức
+      tags:
+      - Platform Media
   /v1/platform/organizations/{org_id}/subscriptions:
     get:
       parameters:
