@@ -69,7 +69,7 @@ func RegisterRoutes(api fiber.Router) {
 	protected.Post("/me/mfa/enable", authHandler.EnableMFA)
 	protected.Post("/me/mfa/disable", authHandler.DisableMFA)
 
-	// Nhóm 2: Quản trị Nhân sự & Phân quyền Platform
+	// Nhóm 2: Quản trị Nhân sự & Phân quyền Platform (Legacy aliases + SPEC-BE-PLATFORM-IAM /iam/*)
 	protected.Get("/users", middleware.RequirePlatformPermission("platform:user:read"), iamHandler.ListUsers)
 	protected.Post("/users", middleware.RequirePlatformPermission("platform:user:manage"), iamHandler.CreateUser)
 	protected.Put("/users/:id/roles", middleware.RequirePlatformPermission("platform:user:manage"), iamHandler.UpdateUserRoles)
@@ -83,6 +83,22 @@ func RegisterRoutes(api fiber.Router) {
 	protected.Put("/roles/:id/permissions", middleware.RequirePlatformPermission("platform:role:manage"), iamHandler.UpdateRolePermissions)
 	protected.Get("/permissions", middleware.RequirePlatformPermission("platform:user:read"), iamHandler.ListPermissions)
 	protected.Get("/menus/tree", middleware.RequirePlatformPermission("platform:user:read"), menuHandler.GetTree)
+
+	// Namespace chuẩn SPEC-BE-PLATFORM-IAM v1.0 (/api/v1/platform/iam/*)
+	iamGroup := protected.Group("/iam")
+	iamGroup.Get("/users", middleware.RequirePlatformPermission("platform:user:read"), iamHandler.ListUsers)
+	iamGroup.Get("/users/:id", middleware.RequirePlatformPermission("platform:user:read"), iamHandler.GetUser)
+	iamGroup.Post("/users", middleware.RequirePlatformPermission("platform:user:create"), iamHandler.CreateUser)
+	iamGroup.Patch("/users/:id", middleware.RequirePlatformPermission("platform:user:update"), iamHandler.UpdateUser)
+	iamGroup.Put("/users/:id/roles", middleware.RequirePlatformPermission("platform:user:assign_role"), iamHandler.UpdateUserRoles)
+	iamGroup.Post("/users/:id/reset-password", middleware.RequirePlatformPermission("platform:user:update"), iamHandler.ResetUserPassword)
+
+	iamGroup.Get("/permissions", middleware.RequirePlatformPermission("platform:role:read"), iamHandler.ListPermissionsGrouped)
+	iamGroup.Get("/roles", middleware.RequirePlatformPermission("platform:role:read"), iamHandler.ListRoles)
+	iamGroup.Get("/roles/:id", middleware.RequirePlatformPermission("platform:role:read"), iamHandler.GetRole)
+	iamGroup.Post("/roles", middleware.RequirePlatformPermission("platform:role:create"), iamHandler.CreateRole)
+	iamGroup.Put("/roles/:id", middleware.RequirePlatformPermission("platform:role:update"), iamHandler.UpdateRole)
+	iamGroup.Delete("/roles/:id", middleware.RequirePlatformPermission("platform:role:delete"), iamHandler.DeleteRole)
 
 	// Nhóm 3: Quản trị Organization, Subdomain & Cloudflare DNS
 	protected.Get("/organizations/check-subdomain", middleware.RequirePlatformPermission("platform:org:read"), tenantHandler.CheckSubdomain)
