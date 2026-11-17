@@ -84,5 +84,6 @@ func (PlatformUserRole) TableName() string {
 type RoleWithSummary struct {
 	PlatformRole
 	UserCount       int64    `json:"user_count"`
+	PermissionCount int64    `json:"permission_count"`
 	PermissionCodes []string `json:"permission_codes"`
 }

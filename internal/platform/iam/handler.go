@@ -33,7 +33,7 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 // @Tags Platform IAM
 // @Produce json
 // @Security BearerAuth
-// @Param search query string false "Tìm kiếm"
+// @Param search query string false "Tìm kiếm theo email hoặc họ tên"
 // @Param status query string false "Trạng thái (ACTIVE, LOCKED, INACTIVE)"
 // @Param role_id query string false "Lọc theo Role ID"
 // @Param page query int false "Trang"
@@ -41,6 +41,7 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 // @Success 200 {object} response.SuccessListResponse{data=[]PlatformUser}
 // @Failure 401 {object} response.ErrorResponse
 // @Failure 403 {object} response.ErrorResponse
+// @Router /v1/platform/iam/users [get]
 // @Router /v1/platform/users [get]
 func (h *Handler) ListUsers(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -68,6 +69,36 @@ func (h *Handler) ListUsers(c *fiber.Ctx) error {
 	})
 }
 
+// GetUser godoc
+// @Summary Chi tiết nhân sự nền tảng
+// @Tags Platform IAM
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Success 200 {object} response.SuccessResponse{data=PlatformUser}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/iam/users/{id} [get]
+func (h *Handler) GetUser(c *fiber.Ctx) error {
+	targetID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID người dùng không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	user, err := h.service.GetUserDetail(ctx, targetID)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy người dùng", nil)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể lấy chi tiết nhân sự nền tảng", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, user)
+}
+
 // CreateUser godoc
 // @Summary Tạo mới nhân sự nền tảng
 // @Tags Platform IAM
@@ -78,6 +109,7 @@ func (h *Handler) ListUsers(c *fiber.Ctx) error {
 // @Success 201 {object} response.SuccessResponse{data=PlatformUser}
 // @Failure 400 {object} response.ErrorResponse
 // @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/iam/users [post]
 // @Router /v1/platform/users [post]
 func (h *Handler) CreateUser(c *fiber.Ctx) error {
 	var body CreateUserInput
@@ -97,13 +129,68 @@ func (h *Handler) CreateUser(c *fiber.Ctx) error {
 
 	user, err := h.service.CreateUser(ctx, body)
 	if err != nil {
-		if errors.Is(err, ErrEmailTaken) {
-			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Email đã tồn tại trên hệ thống", nil)
+		switch {
+		case errors.Is(err, ErrWeakPassword):
+			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Mật khẩu phải có tối thiểu 8 ký tự", nil)
+		case errors.Is(err, ErrEmailTaken):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodePlatformEmailAlreadyExists, "Email nhân sự nền tảng đã tồn tại", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể tạo nhân sự nền tảng", err.Error())
 		}
-		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể tạo nhân sự nền tảng", err.Error())
 	}
 
 	return response.Success(c, fiber.StatusCreated, user)
+}
+
+// UpdateUser godoc
+// @Summary Cập nhật thông tin hoặc trạng thái nhân sự nền tảng
+// @Tags Platform IAM
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param body body UpdateUserInput true "Thông tin cập nhật"
+// @Success 200 {object} response.SuccessResponse{data=PlatformUser}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 422 {object} response.ErrorResponse
+// @Router /v1/platform/iam/users/{id} [patch]
+func (h *Handler) UpdateUser(c *fiber.Ctx) error {
+	targetID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID người dùng không hợp lệ", nil)
+	}
+
+	var body UpdateUserInput
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu đầu vào không hợp lệ", err.Error())
+	}
+
+	body.ActorID = getActorUUID(c)
+	body.IPAddress = c.IP()
+	body.UserAgent = c.Get("User-Agent")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	user, err := h.service.UpdateUser(ctx, targetID, body)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidStatus):
+			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Trạng thái phải là ACTIVE, LOCKED hoặc INACTIVE", nil)
+		case errors.Is(err, ErrUserNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy người dùng", nil)
+		case errors.Is(err, ErrSelfModificationNotAllow):
+			return response.Error(c, fiber.StatusForbidden, response.ErrCodeSelfModificationNotAllowed, "Không thể tự khóa hoặc vô hiệu hóa tài khoản của chính mình", nil)
+		case errors.Is(err, ErrLastRootAdmin):
+			return response.Error(c, fiber.StatusUnprocessableEntity, response.ErrCodeLastRootAdminProtected, "Không thể khóa tài khoản ROOT_ADMIN cuối cùng trên hệ thống", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể cập nhật nhân sự nền tảng", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, user)
 }
 
 // UpdateUserRoles godoc
@@ -113,11 +200,13 @@ func (h *Handler) CreateUser(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID"
-// @Param body body map[string][]string true "role_ids"
+// @Param body body UpdateUserRolesInput true "Danh sách role_ids"
 // @Success 200 {object} response.SuccessResponse
 // @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
 // @Failure 404 {object} response.ErrorResponse
 // @Failure 422 {object} response.ErrorResponse
+// @Router /v1/platform/iam/users/{id}/roles [put]
 // @Router /v1/platform/users/{id}/roles [put]
 func (h *Handler) UpdateUserRoles(c *fiber.Ctx) error {
 	targetID, err := uuid.Parse(c.Params("id"))
@@ -125,9 +214,7 @@ func (h *Handler) UpdateUserRoles(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID người dùng không hợp lệ", nil)
 	}
 
-	var body struct {
-		RoleIDs []uuid.UUID `json:"role_ids"`
-	}
+	var body UpdateUserRolesInput
 	if err := c.BodyParser(&body); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu role_ids không hợp lệ", err.Error())
 	}
@@ -138,6 +225,8 @@ func (h *Handler) UpdateUserRoles(c *fiber.Ctx) error {
 	err = h.service.UpdateUserRoles(ctx, targetID, body.RoleIDs, getActorUUID(c), c.IP(), c.Get("User-Agent"))
 	if err != nil {
 		switch {
+		case errors.Is(err, ErrSelfModificationNotAllow):
+			return response.Error(c, fiber.StatusForbidden, response.ErrCodeSelfModificationNotAllowed, "Không thể tự thay đổi vai trò của chính mình", nil)
 		case errors.Is(err, ErrUserNotFound):
 			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy người dùng", nil)
 		case errors.Is(err, ErrLastRootAdmin):
@@ -157,9 +246,10 @@ func (h *Handler) UpdateUserRoles(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID"
-// @Param body body map[string]string true "status, reason"
+// @Param body body UpdateUserStatusInput true "status, reason"
 // @Success 200 {object} response.SuccessResponse
 // @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
 // @Failure 404 {object} response.ErrorResponse
 // @Failure 422 {object} response.ErrorResponse
 // @Router /v1/platform/users/{id}/status [patch]
@@ -169,10 +259,7 @@ func (h *Handler) UpdateUserStatus(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID người dùng không hợp lệ", nil)
 	}
 
-	var body struct {
-		Status string `json:"status"`
-		Reason string `json:"reason"`
-	}
+	var body UpdateUserStatusInput
 	if err := c.BodyParser(&body); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu không hợp lệ", err.Error())
 	}
@@ -190,8 +277,8 @@ func (h *Handler) UpdateUserStatus(c *fiber.Ctx) error {
 		switch {
 		case errors.Is(err, ErrUserNotFound):
 			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy người dùng", nil)
-		case errors.Is(err, ErrSelfLockNotAllowed):
-			return response.Error(c, fiber.StatusUnprocessableEntity, response.ErrCodeSelfLockNotAllowed, "Không thể tự khóa tài khoản của chính mình", nil)
+		case errors.Is(err, ErrSelfModificationNotAllow), errors.Is(err, ErrSelfLockNotAllowed):
+			return response.Error(c, fiber.StatusForbidden, response.ErrCodeSelfModificationNotAllowed, "Không thể tự khóa tài khoản của chính mình", nil)
 		case errors.Is(err, ErrLastRootAdmin):
 			return response.Error(c, fiber.StatusUnprocessableEntity, response.ErrCodeLastRootAdminProtected, "Không thể khóa tài khoản ROOT_ADMIN cuối cùng trên hệ thống", nil)
 		default:
@@ -209,6 +296,7 @@ func (h *Handler) UpdateUserStatus(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Success 200 {object} response.SuccessResponse{data=[]RoleWithSummary}
 // @Failure 401 {object} response.ErrorResponse
+// @Router /v1/platform/iam/roles [get]
 // @Router /v1/platform/roles [get]
 func (h *Handler) ListRoles(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -222,8 +310,38 @@ func (h *Handler) ListRoles(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, roles)
 }
 
+// GetRole godoc
+// @Summary Chi tiết vai trò nền tảng kèm danh sách quyền và nhân sự
+// @Tags Platform IAM
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Role ID"
+// @Success 200 {object} response.SuccessResponse{data=RoleDetailOutput}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/iam/roles/{id} [get]
+func (h *Handler) GetRole(c *fiber.Ctx) error {
+	roleID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID vai trò không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	detail, err := h.service.GetRoleDetail(ctx, roleID)
+	if err != nil {
+		if errors.Is(err, ErrRoleNotFound) {
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy vai trò", nil)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể lấy chi tiết vai trò", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, detail)
+}
+
 // ListPermissions godoc
-// @Summary Danh sách quyền nền tảng
+// @Summary Danh sách quyền nền tảng (dạng phẳng)
 // @Tags Platform IAM
 // @Produce json
 // @Security BearerAuth
@@ -242,8 +360,28 @@ func (h *Handler) ListPermissions(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, perms)
 }
 
+// ListPermissionsGrouped godoc
+// @Summary Danh sách quyền nền tảng gom nhóm theo Module (Checkbox Matrix)
+// @Tags Platform IAM
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.SuccessResponse{data=[]PermissionModuleGroup}
+// @Failure 401 {object} response.ErrorResponse
+// @Router /v1/platform/iam/permissions [get]
+func (h *Handler) ListPermissionsGrouped(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	groups, err := h.service.ListPermissionsGrouped(ctx)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể lấy danh sách quyền nền tảng", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, groups)
+}
+
 // CreateRole godoc
-// @Summary Tạo mới vai trò nền tảng
+// @Summary Tạo mới vai trò nền tảng và gán quyền
 // @Tags Platform IAM
 // @Accept json
 // @Produce json
@@ -252,6 +390,7 @@ func (h *Handler) ListPermissions(c *fiber.Ctx) error {
 // @Success 201 {object} response.SuccessResponse{data=PlatformRole}
 // @Failure 400 {object} response.ErrorResponse
 // @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/iam/roles [post]
 // @Router /v1/platform/roles [post]
 func (h *Handler) CreateRole(c *fiber.Ctx) error {
 	var body CreateRoleInput
@@ -271,13 +410,109 @@ func (h *Handler) CreateRole(c *fiber.Ctx) error {
 
 	role, err := h.service.CreateRole(ctx, body)
 	if err != nil {
-		if errors.Is(err, ErrRoleCodeTaken) {
+		switch {
+		case errors.Is(err, ErrInvalidRoleCodeFormat):
+			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Mã vai trò phải viết hoa theo chuẩn ^[A-Z0-9_]+$", nil)
+		case errors.Is(err, ErrRoleCodeTaken):
 			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Mã vai trò đã tồn tại", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể tạo vai trò mới", err.Error())
 		}
-		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể tạo vai trò mới", err.Error())
 	}
 
 	return response.Success(c, fiber.StatusCreated, role)
+}
+
+// UpdateRole godoc
+// @Summary Cập nhật thông tin và ma trận quyền của vai trò (tự động xóa cache Redis user liên quan)
+// @Tags Platform IAM
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Role ID"
+// @Param body body UpdateRoleInput true "Thông tin cập nhật vai trò"
+// @Success 200 {object} response.SuccessResponse{data=PlatformRole}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/iam/roles/{id} [put]
+func (h *Handler) UpdateRole(c *fiber.Ctx) error {
+	roleID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID vai trò không hợp lệ", nil)
+	}
+
+	var body UpdateRoleInput
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu đầu vào không hợp lệ", err.Error())
+	}
+	if strings.TrimSpace(body.Name) == "" {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Tên vai trò (name) là bắt buộc", nil)
+	}
+
+	body.ActorID = getActorUUID(c)
+	body.IPAddress = c.IP()
+	body.UserAgent = c.Get("User-Agent")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	role, err := h.service.UpdateRole(ctx, roleID, body)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrRoleNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy vai trò", nil)
+		case errors.Is(err, ErrSystemRoleProtected):
+			return response.Error(c, fiber.StatusForbidden, response.ErrCodeSystemRoleProtected, "Không được phép thay đổi mã (code) của vai trò hệ thống", nil)
+		case errors.Is(err, ErrInvalidRoleCodeFormat):
+			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Mã vai trò phải viết hoa theo chuẩn ^[A-Z0-9_]+$", nil)
+		case errors.Is(err, ErrRoleCodeTaken):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Mã vai trò đã tồn tại", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể cập nhật vai trò", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, role)
+}
+
+// DeleteRole godoc
+// @Summary Xóa vai trò tùy chỉnh
+// @Tags Platform IAM
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Role ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/iam/roles/{id} [delete]
+func (h *Handler) DeleteRole(c *fiber.Ctx) error {
+	roleID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID vai trò không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = h.service.DeleteRole(ctx, roleID, getActorUUID(c), c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrRoleNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy vai trò", nil)
+		case errors.Is(err, ErrSystemRoleProtected):
+			return response.Error(c, fiber.StatusForbidden, response.ErrCodeSystemRoleProtected, "Không được phép xóa vai trò hệ thống (is_system = true)", nil)
+		case errors.Is(err, ErrRoleInUse):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeRoleInUse, "Không thể xóa vai trò vì đang có nhân sự nắm giữ vai trò này", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa vai trò", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_role_id": roleID})
 }
 
 // UpdateRolePermissions godoc
@@ -287,7 +522,7 @@ func (h *Handler) CreateRole(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Role ID"
-// @Param body body map[string][]string true "permission_ids / permission_codes"
+// @Param body body UpdateRolePermissionsInput true "permission_ids / permission_codes"
 // @Success 200 {object} response.SuccessResponse
 // @Failure 400 {object} response.ErrorResponse
 // @Failure 404 {object} response.ErrorResponse
@@ -298,10 +533,7 @@ func (h *Handler) UpdateRolePermissions(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID vai trò không hợp lệ", nil)
 	}
 
-	var body struct {
-		PermissionIDs   []uuid.UUID `json:"permission_ids"`
-		PermissionCodes []string    `json:"permission_codes"`
-	}
+	var body UpdateRolePermissionsInput
 	if err := c.BodyParser(&body); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu không hợp lệ", err.Error())
 	}
@@ -325,16 +557,17 @@ func (h *Handler) UpdateRolePermissions(c *fiber.Ctx) error {
 }
 
 // ResetUserPassword godoc
-// @Summary Đặt lại mật khẩu nhân sự nền tảng
+// @Summary Đặt lại mật khẩu tạm thời nhân sự nền tảng
 // @Tags Platform IAM
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID"
-// @Param body body map[string]any true "new_password, must_change_password, reason"
+// @Param body body ResetUserPasswordInput true "new_password, must_change_password, reason"
 // @Success 200 {object} response.SuccessResponse
 // @Failure 400 {object} response.ErrorResponse
 // @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/iam/users/{id}/reset-password [post]
 // @Router /v1/platform/users/{id}/password [patch]
 func (h *Handler) ResetUserPassword(c *fiber.Ctx) error {
 	targetID, err := uuid.Parse(c.Params("id"))
@@ -342,11 +575,7 @@ func (h *Handler) ResetUserPassword(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID người dùng không hợp lệ", nil)
 	}
 
-	var body struct {
-		NewPassword        string `json:"new_password"`
-		MustChangePassword *bool  `json:"must_change_password"`
-		Reason             string `json:"reason"`
-	}
+	var body ResetUserPasswordInput
 	if err := c.BodyParser(&body); err != nil || strings.TrimSpace(body.NewPassword) == "" {
 		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "new_password là bắt buộc", nil)
 	}
@@ -384,7 +613,7 @@ func (h *Handler) ResetUserPassword(c *fiber.Ctx) error {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID"
-// @Param body body map[string]string true "reason"
+// @Param body body ForceDisableMFAInput true "reason"
 // @Success 200 {object} response.SuccessResponse
 // @Failure 400 {object} response.ErrorResponse
 // @Failure 404 {object} response.ErrorResponse
@@ -397,9 +626,7 @@ func (h *Handler) ForceDisableUserMFA(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID người dùng không hợp lệ", nil)
 	}
 
-	var body struct {
-		Reason string `json:"reason"`
-	}
+	var body ForceDisableMFAInput
 	_ = c.BodyParser(&body)
 	reason := strings.TrimSpace(body.Reason)
 	if reason == "" {
@@ -426,4 +653,3 @@ func (h *Handler) ForceDisableUserMFA(c *fiber.Ctx) error {
 		"mfa_enabled": false,
 	})
 }
-
