@@ -124,8 +124,12 @@ func (h *Handler) PublicTenantResolve(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Lỗi phân giải thông tin Tổ chức", err.Error())
 	}
 
-	if action, _ := res["action"].(string); action == "NOT_FOUND" {
-		return response.Success(c, fiber.StatusNotFound, res)
+	if action, _ := res["action"].(string); action == "NOT_FOUND" || action == "RESERVED" {
+		msg, _ := res["message"].(string)
+		if msg == "" {
+			msg = "Không tìm thấy thông tin tổ chức cho subdomain này"
+		}
+		return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, msg, res)
 	}
 
 	return response.Success(c, fiber.StatusOK, res)
