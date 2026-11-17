@@ -692,8 +692,22 @@ func (s *Service) SyncReservedSubdomainsFromCloudflare(ctx context.Context, acto
 	}, nil
 }
 
-// CheckSubdomainAvailability kiểm tra nhanh tính khả dụng của subdomain (Regex, Reserved, DB, Redirect History & Cloudflare API).
-func (s *Service) CheckSubdomainAvailability(ctx context.Context, subdomain string) (map[string]any, error) {
+type SubdomainCheckOutput struct {
+	Subdomain         string `json:"subdomain" example:"thpt-chu-van-an"`
+	FQDN              string `json:"fqdn" example:"thpt-chu-van-an.nghia196.qzz.io"`
+	Valid             bool   `json:"valid" example:"true"`
+	Exists            bool   `json:"exists" example:"false"`
+	Available         bool   `json:"available" example:"true"`
+	CloudflareChecked bool   `json:"cloudflare_checked" example:"true"`
+	CloudflareError   string `json:"cloudflare_error,omitempty"`
+	Reason            string `json:"reason" example:"AVAILABLE"`
+	Message           string `json:"message" example:"Subdomain hợp lệ và chưa tồn tại, có thể sử dụng"`
+}
+
+// CheckSubdomainAvailability kiểm tra tính hợp lệ và tồn tại của subdomain:
+// 1) Định dạng hợp lệ (regex), 2) Danh sách giữ chỗ (reserved_subdomains),
+// 3) Tồn tại trên Cloudflare DNS, 4) Đã thuộc tổ chức hoặc đang redirect trong DB.
+func (s *Service) CheckSubdomainAvailability(ctx context.Context, subdomain string) (*SubdomainCheckOutput, error) {
 	subdomain = strings.ToLower(strings.TrimSpace(subdomain))
 	rootDomain := "school-erp.vn"
 	if s.cf != nil {
@@ -701,77 +715,110 @@ func (s *Service) CheckSubdomainAvailability(ctx context.Context, subdomain stri
 	}
 	fqdn := fmt.Sprintf("%s.%s", subdomain, rootDomain)
 
+	// 1. Kiểm tra định dạng hợp lệ
 	if !subdomainRegex.MatchString(subdomain) {
-		return map[string]any{
-			"subdomain": subdomain,
-			"fqdn":      fqdn,
-			"available": false,
-			"reason":    "INVALID_FORMAT",
-			"message":   "Subdomain phải dài 3-40 ký tự, chỉ gồm a-z, 0-9, '-' và không bắt đầu/kết thúc bằng '-'",
+		return &SubdomainCheckOutput{
+			Subdomain: subdomain,
+			FQDN:      fqdn,
+			Valid:     false,
+			Exists:    false,
+			Available: false,
+			Reason:    "INVALID_FORMAT",
+			Message:   "Subdomain không hợp lệ (phải dài 3-40 ký tự, chỉ gồm a-z, 0-9, '-' và không bắt đầu/kết thúc bằng '-')",
 		}, nil
 	}
 
+	// 2. Kiểm tra danh sách giữ chỗ trước (reserved_subdomains)
 	var reservedCount int64
-	s.db.WithContext(ctx).Model(&ReservedSubdomain{}).Where("LOWER(keyword) = ?", subdomain).Count(&reservedCount)
+	if err := s.db.WithContext(ctx).Model(&ReservedSubdomain{}).Where("LOWER(keyword) = ?", subdomain).Count(&reservedCount).Error; err != nil {
+		return nil, err
+	}
 	if reservedCount > 0 {
-		return map[string]any{
-			"subdomain": subdomain,
-			"fqdn":      fqdn,
-			"available": false,
-			"reason":    "RESERVED_KEYWORD",
-			"message":   "Subdomain nằm trong danh sách từ khóa hệ thống giữ chỗ",
+		return &SubdomainCheckOutput{
+			Subdomain: subdomain,
+			FQDN:      fqdn,
+			Valid:     true,
+			Exists:    true,
+			Available: false,
+			Reason:    "RESERVED_KEYWORD",
+			Message:   "Subdomain nằm trong danh sách từ khóa giữ chỗ của hệ thống",
 		}, nil
 	}
 
-	var orgCount int64
-	s.db.WithContext(ctx).Model(&Organization{}).Where("LOWER(subdomain) = ?", subdomain).Count(&orgCount)
-	if orgCount > 0 {
-		return map[string]any{
-			"subdomain": subdomain,
-			"fqdn":      fqdn,
-			"available": false,
-			"reason":    "TAKEN_BY_ORGANIZATION",
-			"message":   "Subdomain đã được một Tổ chức khác sử dụng",
-		}, nil
-	}
-
-	var redirectCount int64
-	s.db.WithContext(ctx).Model(&OrganizationSubdomainHistory{}).
-		Where("LOWER(old_subdomain) = ? AND old_record_status = 'REDIRECTING' AND (redirect_until IS NULL OR redirect_until > ?)", subdomain, time.Now()).
-		Count(&redirectCount)
-	if redirectCount > 0 {
-		return map[string]any{
-			"subdomain": subdomain,
-			"fqdn":      fqdn,
-			"available": false,
-			"reason":    "ACTIVE_REDIRECT_HISTORY",
-			"message":   "Subdomain đang trong thời gian chuyển hướng (Redirect 301/308) từ một Tổ chức cũ",
-		}, nil
-	}
-
+	// 3. Nếu không có trong giữ chỗ -> kiểm tra trực tiếp trên Cloudflare DNS
 	cfChecked := false
+	var cfErrMsg string
 	if s.cf != nil && s.cf.IsConfigured() {
-		cfChecked = true
 		rec, err := s.cf.FindRecordByFQDN(ctx, fqdn)
 		if err == nil && rec != nil {
-			return map[string]any{
-				"subdomain":          subdomain,
-				"fqdn":               fqdn,
-				"available":          false,
-				"cloudflare_checked": true,
-				"reason":             "EXISTS_ON_CLOUDFLARE",
-				"message":            "Tên miền phụ đã tồn tại bản ghi DNS trên Cloudflare",
+			return &SubdomainCheckOutput{
+				Subdomain:         subdomain,
+				FQDN:              fqdn,
+				Valid:             true,
+				Exists:            true,
+				Available:         false,
+				CloudflareChecked: true,
+				Reason:            "EXISTS_ON_CLOUDFLARE",
+				Message:           "Subdomain đã tồn tại bản ghi DNS trên Cloudflare",
 			}, nil
+		}
+		if errors.Is(err, cloudflare.ErrRecordNotFound) {
+			cfChecked = true
+		} else if err != nil {
+			cfErrMsg = err.Error()
 		}
 	}
 
-	return map[string]any{
-		"subdomain":          subdomain,
-		"fqdn":               fqdn,
-		"available":          true,
-		"cloudflare_checked": cfChecked,
-		"reason":             "AVAILABLE",
-		"message":            "Subdomain hợp lệ và có thể sử dụng",
+	// 4. Kiểm tra trong bảng organizations (VD: tổ chức đang PENDING_APPROVAL chưa tạo DNS)
+	var orgCount int64
+	if err := s.db.WithContext(ctx).Model(&Organization{}).Where("LOWER(subdomain) = ?", subdomain).Count(&orgCount).Error; err != nil {
+		return nil, err
+	}
+	if orgCount > 0 {
+		return &SubdomainCheckOutput{
+			Subdomain:         subdomain,
+			FQDN:              fqdn,
+			Valid:             true,
+			Exists:            true,
+			Available:         false,
+			CloudflareChecked: cfChecked,
+			CloudflareError:   cfErrMsg,
+			Reason:            "TAKEN_BY_ORGANIZATION",
+			Message:           "Subdomain đã tồn tại và thuộc về một Tổ chức khác",
+		}, nil
+	}
+
+	// 5. Kiểm tra trong lịch sử đổi subdomain đang còn hiệu lực redirect
+	var redirectCount int64
+	if err := s.db.WithContext(ctx).Model(&OrganizationSubdomainHistory{}).
+		Where("LOWER(old_subdomain) = ? AND old_record_status = 'REDIRECTING' AND (redirect_until IS NULL OR redirect_until > ?)", subdomain, time.Now()).
+		Count(&redirectCount).Error; err != nil {
+		return nil, err
+	}
+	if redirectCount > 0 {
+		return &SubdomainCheckOutput{
+			Subdomain:         subdomain,
+			FQDN:              fqdn,
+			Valid:             true,
+			Exists:            true,
+			Available:         false,
+			CloudflareChecked: cfChecked,
+			CloudflareError:   cfErrMsg,
+			Reason:            "ACTIVE_REDIRECT_HISTORY",
+			Message:           "Subdomain đang trong thời gian chuyển hướng (Redirect 301/308) từ một Tổ chức cũ",
+		}, nil
+	}
+
+	return &SubdomainCheckOutput{
+		Subdomain:         subdomain,
+		FQDN:              fqdn,
+		Valid:             true,
+		Exists:            false,
+		Available:         true,
+		CloudflareChecked: cfChecked,
+		CloudflareError:   cfErrMsg,
+		Reason:            "AVAILABLE",
+		Message:           "Subdomain hợp lệ và chưa tồn tại, có thể sử dụng",
 	}, nil
 }
 

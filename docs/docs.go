@@ -2170,7 +2170,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.SuccessResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/tenant_mgmt.SubdomainCheckOutput"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -6477,6 +6489,46 @@ const docTemplate = `{
                 },
                 "reason": {
                     "type": "string"
+                }
+            }
+        },
+        "tenant_mgmt.SubdomainCheckOutput": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "cloudflare_checked": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "cloudflare_error": {
+                    "type": "string"
+                },
+                "exists": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "fqdn": {
+                    "type": "string",
+                    "example": "thpt-chu-van-an.nghia196.qzz.io"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Subdomain hợp lệ và chưa tồn tại, có thể sử dụng"
+                },
+                "reason": {
+                    "type": "string",
+                    "example": "AVAILABLE"
+                },
+                "subdomain": {
+                    "type": "string",
+                    "example": "thpt-chu-van-an"
+                },
+                "valid": {
+                    "type": "boolean",
+                    "example": true
                 }
             }
         }

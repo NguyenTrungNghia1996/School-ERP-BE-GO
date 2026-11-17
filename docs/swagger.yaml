@@ -1199,6 +1199,35 @@ definitions:
       reason:
         type: string
     type: object
+  tenant_mgmt.SubdomainCheckOutput:
+    properties:
+      available:
+        example: true
+        type: boolean
+      cloudflare_checked:
+        example: true
+        type: boolean
+      cloudflare_error:
+        type: string
+      exists:
+        example: false
+        type: boolean
+      fqdn:
+        example: thpt-chu-van-an.nghia196.qzz.io
+        type: string
+      message:
+        example: Subdomain hợp lệ và chưa tồn tại, có thể sử dụng
+        type: string
+      reason:
+        example: AVAILABLE
+        type: string
+      subdomain:
+        example: thpt-chu-van-an
+        type: string
+      valid:
+        example: true
+        type: boolean
+    type: object
 info:
   contact: {}
   description: REST API for School ERP
@@ -2839,7 +2868,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.SuccessResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/tenant_mgmt.SubdomainCheckOutput'
+              type: object
         "400":
           description: Bad Request
           schema:

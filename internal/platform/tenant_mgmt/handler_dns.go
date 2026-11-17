@@ -17,7 +17,7 @@ import (
 // @Produce json
 // @Security BearerAuth
 // @Param subdomain query string true "Subdomain cần kiểm tra"
-// @Success 200 {object} response.SuccessResponse
+// @Success 200 {object} response.SuccessResponse{data=SubdomainCheckOutput}
 // @Failure 400 {object} response.ErrorResponse
 // @Router /v1/platform/organizations/check-subdomain [get]
 func (h *Handler) CheckSubdomain(c *fiber.Ctx) error {
