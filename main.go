@@ -25,6 +25,7 @@ func main() {
 	config.RunMigrations()
 	config.ConnectRedis()
 	config.InitCloudflare()
+	config.InitStorage()
 
 	if err := seed.Run(config.DB); err != nil {
 		log.Printf("⚠️ Lỗi chạy seed dữ liệu: %v\n", err)

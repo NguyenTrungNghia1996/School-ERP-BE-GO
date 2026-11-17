@@ -121,6 +121,21 @@ func (s *Service) CalculateEntitlement(ctx context.Context, orgID uuid.UUID) (*O
 	return ent, nil
 }
 
+// GetStorageQuotaBytes returns the effective storage quota in bytes for an organization (0 means no package quota set).
+func (s *Service) GetStorageQuotaBytes(ctx context.Context, orgID uuid.UUID) (int64, error) {
+	ent, err := s.CalculateEntitlement(ctx, orgID)
+	if err != nil {
+		return 0, err
+	}
+	if mb := ent.EffectiveQuotas["max_storage_mb"]; mb > 0 {
+		return mb * 1024 * 1024, nil
+	}
+	if gb := ent.EffectiveQuotas["max_storage_gb"]; gb > 0 {
+		return gb * 1024 * 1024 * 1024, nil
+	}
+	return 0, nil
+}
+
 func parseQuotaMap(raw json.RawMessage) map[string]int64 {
 	res := make(map[string]int64)
 	if len(raw) == 0 {

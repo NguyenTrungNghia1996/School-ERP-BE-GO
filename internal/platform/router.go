@@ -8,6 +8,7 @@ import (
 	"school-erp/internal/platform/billing"
 	"school-erp/internal/platform/catalog"
 	"school-erp/internal/platform/iam"
+	"school-erp/internal/platform/media"
 	"school-erp/internal/platform/menu"
 	"school-erp/internal/platform/support"
 	"school-erp/internal/platform/tenant_mgmt"
@@ -42,6 +43,9 @@ func RegisterRoutes(api fiber.Router) {
 
 	billingService := billing.NewService(db, rdb, auditService)
 	billingHandler := billing.NewHandler(billingService)
+
+	mediaService := media.NewService(db, config.StorageClient, billingService, auditService)
+	mediaHandler := media.NewHandler(mediaService)
 
 	supportService := support.NewService(db, rdb, auditService)
 	supportHandler := support.NewHandler(supportService)
@@ -158,4 +162,11 @@ func RegisterRoutes(api fiber.Router) {
 
 	// Nhóm 6: Audit Logs
 	protected.Get("/audit-logs", middleware.RequirePlatformPermission("platform:audit:read"), auditHandler.List)
+
+	// Nhóm 7: Lưu trữ ảnh S3 / Cloudflare R2 & Dung lượng theo từng đơn vị
+	protected.Get("/organizations/:org_id/storage/usage", middleware.RequirePlatformPermission("platform:media:read"), mediaHandler.GetUsage)
+	protected.Get("/organizations/:org_id/media", middleware.RequirePlatformPermission("platform:media:read"), mediaHandler.ListFiles)
+	protected.Get("/organizations/:org_id/media/:file_id/url", middleware.RequirePlatformPermission("platform:media:read"), mediaHandler.GetFileURL)
+	protected.Post("/organizations/:org_id/media/upload", middleware.RequirePlatformPermission("platform:media:manage"), mediaHandler.UploadImage)
+	protected.Delete("/organizations/:org_id/media/:file_id", middleware.RequirePlatformPermission("platform:media:manage"), mediaHandler.DeleteFile)
 }
