@@ -211,6 +211,60 @@ func (c *Client) FindRecordByFQDN(ctx context.Context, fqdn string) (*DNSRecord,
 	return nil, ErrRecordNotFound
 }
 
+type cfListResultInfo struct {
+	Page       int `json:"page"`
+	PerPage    int `json:"per_page"`
+	TotalPages int `json:"total_pages"`
+}
+
+type cfListAPIResponse struct {
+	Success bool `json:"success"`
+	Errors  []struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"errors"`
+	Result     []DNSRecord      `json:"result"`
+	ResultInfo cfListResultInfo `json:"result_info"`
+}
+
+// ListRecords fetches all DNS records in the configured Cloudflare zone.
+func (c *Client) ListRecords(ctx context.Context) ([]DNSRecord, error) {
+	if !c.IsConfigured() {
+		return nil, ErrNotConfigured
+	}
+
+	var all []DNSRecord
+	for page := 1; ; page++ {
+		endpoint := fmt.Sprintf("%s/zones/%s/dns_records?per_page=100&page=%d", c.baseURL, c.zoneID, page)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			return nil, err
+		}
+		c.setHeaders(req)
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		var cfResp cfListAPIResponse
+		decodeErr := json.NewDecoder(resp.Body).Decode(&cfResp)
+		resp.Body.Close()
+		if decodeErr != nil {
+			return nil, decodeErr
+		}
+		if !cfResp.Success {
+			return nil, fmt.Errorf("cloudflare list DNS failed: %+v", cfResp.Errors)
+		}
+
+		all = append(all, cfResp.Result...)
+		if cfResp.ResultInfo.TotalPages <= page || len(cfResp.Result) == 0 {
+			break
+		}
+	}
+	return all, nil
+}
+
 func (c *Client) setHeaders(req *http.Request) {
 	req.Header.Set("Authorization", "Bearer "+c.apiToken)
 	req.Header.Set("Content-Type", "application/json")

@@ -3198,6 +3198,25 @@ paths:
       summary: Thêm từ khóa Subdomain giữ chỗ
       tags:
       - Platform Organizations
+  /v1/platform/reserved-subdomains/sync-cloudflare:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Đồng bộ các subdomain đang tồn tại trên Cloudflare DNS vào danh sách
+        giữ chỗ
+      tags:
+      - Platform Organizations
   /v1/platform/roles:
     get:
       produces:

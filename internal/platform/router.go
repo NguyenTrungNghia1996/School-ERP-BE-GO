@@ -113,6 +113,7 @@ func RegisterRoutes(api fiber.Router) {
 	protected.Delete("/subdomain-histories/:history_id/dns", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.DeleteRedirectHistoryDNS)
 	protected.Get("/reserved-subdomains", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.ListReservedSubdomains)
 	protected.Post("/reserved-subdomains", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.AddReservedSubdomain)
+	protected.Post("/reserved-subdomains/sync-cloudflare", middleware.RequirePlatformPermission("platform:subdomain:manage"), tenantHandler.SyncReservedSubdomains)
 
 	// Nhóm 4.1: Quản trị Catalog (Features, Permissions, Base Menus, Routes)
 	protected.Get("/catalog/features", middleware.RequirePlatformPermission("platform:feature:manage"), catalogHandler.ListFeatures)

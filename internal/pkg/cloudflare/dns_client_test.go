@@ -78,4 +78,10 @@ func TestCloudflareClientCreateAndDelete(t *testing.T) {
 	if err := client.DeleteRecord(ctx, newID); err != nil {
 		t.Fatalf("DeleteRecord failed: %v", err)
 	}
+
+	// 4. List records
+	records, err := client.ListRecords(ctx)
+	if err != nil || len(records) != 0 {
+		t.Fatalf("expected 0 records on empty mock list, got %d (err=%v)", len(records), err)
+	}
 }
