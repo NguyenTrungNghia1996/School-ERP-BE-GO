@@ -130,3 +130,23 @@ func (h *Handler) PublicTenantResolve(c *fiber.Ctx) error {
 
 	return response.Success(c, fiber.StatusOK, res)
 }
+
+// SyncReservedSubdomains godoc
+// @Summary Đồng bộ các subdomain đang tồn tại trên Cloudflare DNS vào danh sách giữ chỗ
+// @Tags Platform Organizations
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.SuccessResponse
+// @Failure 500 {object} response.ErrorResponse
+// @Router /v1/platform/reserved-subdomains/sync-cloudflare [post]
+func (h *Handler) SyncReservedSubdomains(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	res, err := h.service.SyncReservedSubdomainsFromCloudflare(ctx, getActorUUID(c), c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể đồng bộ danh sách DNS từ Cloudflare", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, res)
+}

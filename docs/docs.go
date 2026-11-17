@@ -3371,6 +3371,36 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/platform/reserved-subdomains/sync-cloudflare": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Platform Organizations"
+                ],
+                "summary": "Đồng bộ các subdomain đang tồn tại trên Cloudflare DNS vào danh sách giữ chỗ",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/platform/roles": {
             "get": {
                 "security": [

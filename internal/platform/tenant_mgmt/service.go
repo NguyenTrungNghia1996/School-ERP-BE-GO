@@ -88,6 +88,17 @@ func (s *Service) validateSubdomain(tx *gorm.DB, subdomain string, excludeOrgID 
 	return nil
 }
 
+func (s *Service) ensureSubdomainNotOnCloudflare(ctx context.Context, subdomain string) error {
+	if s.cf == nil || !s.cf.IsConfigured() {
+		return nil
+	}
+	rec, err := s.cf.FindRecordByFQDN(ctx, s.cf.BuildFQDN(subdomain))
+	if err == nil && rec != nil {
+		return ErrSubdomainReservedOrTaken
+	}
+	return nil
+}
+
 type ListOrgsFilter struct {
 	Search    string
 	Status    string
@@ -225,6 +236,12 @@ type CreateOrganizationInput struct {
 
 func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizationInput) (map[string]any, error) {
 	subdomain := strings.ToLower(strings.TrimSpace(input.Subdomain))
+	if !subdomainRegex.MatchString(subdomain) {
+		return nil, ErrSubdomainInvalidFormat
+	}
+	if err := s.ensureSubdomainNotOnCloudflare(ctx, subdomain); err != nil {
+		return nil, err
+	}
 	orgCode := strings.ToUpper(strings.TrimSpace(input.Code))
 	if orgCode == "" {
 		orgCode = fmt.Sprintf("ORG-%s", strings.ToUpper(subdomain))
@@ -459,9 +476,17 @@ func (s *Service) UpdateOrganizationStatus(ctx context.Context, orgID uuid.UUID,
 
 func (s *Service) ChangeSubdomain(ctx context.Context, orgID uuid.UUID, newSubdomain, reason string, redirectUntil *time.Time, actorID uuid.UUID, ip, ua string) (*Organization, error) {
 	newSubdomain = strings.ToLower(strings.TrimSpace(newSubdomain))
+	if !subdomainRegex.MatchString(newSubdomain) {
+		return nil, ErrSubdomainInvalidFormat
+	}
 	var org Organization
 	if err := s.db.WithContext(ctx).First(&org, "id = ?", orgID).Error; err != nil {
 		return nil, ErrOrgNotFound
+	}
+	if newSubdomain != strings.ToLower(org.Subdomain) {
+		if err := s.ensureSubdomainNotOnCloudflare(ctx, newSubdomain); err != nil {
+			return nil, err
+		}
 	}
 
 	oldSubdomain := org.Subdomain
@@ -580,6 +605,91 @@ func (s *Service) AddReservedSubdomain(ctx context.Context, keyword, reason stri
 		return nil, err
 	}
 	return item, nil
+}
+
+// SyncReservedSubdomainsFromCloudflare fetches existing DNS records from Cloudflare and inserts
+// matching single-label subdomains (not belonging to active organizations) into reserved_subdomains.
+func (s *Service) SyncReservedSubdomainsFromCloudflare(ctx context.Context, actorID uuid.UUID, ip, ua string) (map[string]any, error) {
+	if s.cf == nil || !s.cf.IsConfigured() {
+		return nil, fmt.Errorf("cloudflare chưa được cấu hình")
+	}
+
+	records, err := s.cf.ListRecords(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var orgSubdomains []string
+	s.db.WithContext(ctx).Model(&Organization{}).Pluck("LOWER(subdomain)", &orgSubdomains)
+	var redirectSubdomains []string
+	s.db.WithContext(ctx).Model(&OrganizationSubdomainHistory{}).
+		Where("old_record_status = 'REDIRECTING' AND (redirect_until IS NULL OR redirect_until > ?)", time.Now()).
+		Pluck("LOWER(old_subdomain)", &redirectSubdomains)
+	var existingReserved []string
+	s.db.WithContext(ctx).Model(&ReservedSubdomain{}).Pluck("LOWER(keyword)", &existingReserved)
+
+	skip := make(map[string]bool)
+	for _, sub := range orgSubdomains {
+		skip[sub] = true
+	}
+	for _, sub := range redirectSubdomains {
+		skip[sub] = true
+	}
+	for _, kw := range existingReserved {
+		skip[kw] = true
+	}
+
+	suffix := "." + strings.ToLower(s.cf.RootDomain())
+	added := make([]string, 0)
+
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, rec := range records {
+			name := strings.ToLower(strings.TrimSpace(rec.Name))
+			if !strings.HasSuffix(name, suffix) {
+				continue
+			}
+			label := strings.TrimSuffix(name, suffix)
+			if label == "" || strings.Contains(label, ".") || !subdomainRegex.MatchString(label) {
+				continue
+			}
+			if skip[label] {
+				continue
+			}
+			skip[label] = true
+
+			item := ReservedSubdomain{
+				Keyword:   label,
+				Reason:    fmt.Sprintf("Synced from Cloudflare DNS (%s: %s)", rec.Type, name),
+				CreatedBy: &actorID,
+			}
+			if err := tx.Create(&item).Error; err != nil {
+				return err
+			}
+			added = append(added, label)
+		}
+
+		if len(added) > 0 && s.auditor != nil {
+			return s.auditor.Log(tx, audit.AuditEntry{
+				ActorType:    "PLATFORM",
+				ActorID:      &actorID,
+				Action:       "RESERVED_SUBDOMAINS_SYNCED_CLOUDFLARE",
+				ResourceType: "RESERVED_SUBDOMAIN",
+				AfterData:    map[string]any{"added_keywords": added},
+				IPAddress:    ip,
+				UserAgent:    ua,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"total_records_scanned": len(records),
+		"added_count":           len(added),
+		"added_keywords":        added,
+	}, nil
 }
 
 // CheckSubdomainAvailability kiểm tra nhanh tính khả dụng của subdomain (Regex, Reserved, DB, Redirect History & Cloudflare API).
