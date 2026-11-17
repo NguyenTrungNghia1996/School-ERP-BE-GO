@@ -993,8 +993,20 @@ func (s *Service) ResolveTenantBySubdomain(ctx context.Context, subdomain string
 		return res, nil
 	}
 
+	// 3. Kiểm tra nếu subdomain nằm trong danh sách giữ chỗ của hệ thống
+	var reserved ReservedSubdomain
+	if err := s.db.WithContext(ctx).Where("LOWER(keyword) = ?", subdomain).First(&reserved).Error; err == nil {
+		return map[string]any{
+			"action":          "RESERVED",
+			"subdomain":       subdomain,
+			"reserved_reason": reserved.Reason,
+			"message":         fmt.Sprintf("Subdomain '%s' là tên miền hệ thống giữ chỗ (%s), không thuộc tổ chức nào", subdomain, reserved.Reason),
+		}, nil
+	}
+
 	return map[string]any{
 		"action":    "NOT_FOUND",
 		"subdomain": subdomain,
+		"message":   fmt.Sprintf("Không tìm thấy tổ chức nào đang sử dụng subdomain '%s'", subdomain),
 	}, nil
 }
