@@ -420,3 +420,167 @@ func (h *Handler) PurgeFile(c *fiber.Ctx) error {
 
 	return response.Success(c, fiber.StatusOK, fiber.Map{"purged_file_id": fileID})
 }
+
+// UploadPlatformFile godoc
+// @Summary Upload ảnh hoặc tài liệu cấp Platform (không cần org_id, lưu tại platform/{folder}/...)
+// @Tags Platform Media
+// @Accept mpfd
+// @Produce json
+// @Security BearerAuth
+// @Param file formData file true "Tệp ảnh (JPEG, PNG, WEBP, GIF) hoặc tài liệu (PDF, DOC, DOCX, XLS, XLSX; tối đa 25 MB)"
+// @Param folder formData string false "Thư mục con (VD: avatars, branding, docs; mặc định: general)"
+// @Success 201 {object} response.SuccessResponse{data=StoredFile}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 413 {object} response.ErrorResponse
+// @Failure 503 {object} response.ErrorResponse
+// @Router /v1/platform/media/upload [post]
+func (h *Handler) UploadPlatformFile(c *fiber.Ctx) error {
+	fh, err := c.FormFile("file")
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Thiếu tệp tải lên (field 'file')", nil)
+	}
+
+	f, err := fh.Open()
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Không thể đọc tệp tải lên", err.Error())
+	}
+	defer f.Close()
+
+	data, err := io.ReadAll(io.LimitReader(f, maxImageSizeBytes()+1))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Lỗi đọc dữ liệu tệp", err.Error())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	record, err := h.service.UploadPlatformFile(ctx, UploadPlatformFileInput{
+		UploadedBy:   getActorUUID(c),
+		Folder:       c.FormValue("folder"),
+		OriginalName: fh.Filename,
+		Data:         data,
+		IPAddress:    c.IP(),
+		UserAgent:    c.Get("User-Agent"),
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrStorageNotConfigured):
+			return response.Error(c, fiber.StatusServiceUnavailable, response.ErrCodeStorageNotConfigured, "Dịch vụ lưu trữ S3/R2 chưa được cấu hình", nil)
+		case errors.Is(err, ErrInvalidImageType), errors.Is(err, ErrInvalidFolder):
+			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, err.Error(), nil)
+		case errors.Is(err, ErrFileTooLarge):
+			return response.Error(c, fiber.StatusRequestEntityTooLarge, response.ErrCodeValidationFailed, "Kích thước tệp vượt quá giới hạn cho phép", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể tải tệp lên S3/R2", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusCreated, record)
+}
+
+// ListPlatformFiles godoc
+// @Summary Danh sách tệp media cấp Platform (không gắn org_id)
+// @Tags Platform Media
+// @Produce json
+// @Security BearerAuth
+// @Param folder query string false "Lọc theo thư mục con"
+// @Param page query int false "Trang"
+// @Param limit query int false "Số lượng mỗi trang"
+// @Success 200 {object} response.SuccessListResponse{data=[]StoredFile}
+// @Failure 400 {object} response.ErrorResponse
+// @Router /v1/platform/media [get]
+func (h *Handler) ListPlatformFiles(c *fiber.Ctx) error {
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 20)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	files, total, err := h.service.ListPlatformFiles(ctx, c.Query("folder"), page, limit)
+	if err != nil {
+		if errors.Is(err, ErrInvalidFolder) {
+			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Tên thư mục không hợp lệ", nil)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể tải danh sách tệp Platform", err.Error())
+	}
+
+	return response.SuccessWithMeta(c, fiber.StatusOK, files, response.Meta{
+		Page:  page,
+		Limit: limit,
+		Total: total,
+	})
+}
+
+// DeletePlatformFileByURL godoc
+// @Summary Xóa tệp cấp Platform theo access_url (chuyển vào thùng rác, tự xóa khỏi R2 sau N ngày)
+// @Tags Platform Media
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body DeleteByURLInput true "Đường dẫn access_url của tệp cấp Platform cần xóa"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/media/by-url [delete]
+func (h *Handler) DeletePlatformFileByURL(c *fiber.Ctx) error {
+	var body DeleteByURLInput
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu không hợp lệ", err.Error())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	fileID, objectKey, err := h.service.DeletePlatformFileByAccessURL(ctx, body.AccessURL, getActorUUID(c), c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidAccessURL):
+			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, err.Error(), nil)
+		case errors.Is(err, ErrFileNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy tệp cấp Platform", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa tệp theo access_url", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{
+		"deleted_file_id": fileID,
+		"object_key":      objectKey,
+		"retention_days":  TrashRetentionDays(),
+	})
+}
+
+// DeletePlatformFile godoc
+// @Summary [Hạn chế sử dụng] Chuyển tệp cấp Platform vào thùng rác theo file_id
+// @Description Hạn chế sử dụng — ưu tiên dùng DELETE /v1/platform/media/by-url với access_url.
+// @Deprecated
+// @Tags Platform Media
+// @Produce json
+// @Security BearerAuth
+// @Param file_id path string true "File ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/media/{file_id} [delete]
+func (h *Handler) DeletePlatformFile(c *fiber.Ctx) error {
+	c.Set("Deprecation", "true")
+	fileID, err := uuid.Parse(c.Params("file_id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID tệp không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := h.service.DeletePlatformFile(ctx, fileID, getActorUUID(c), c.IP(), c.Get("User-Agent")); err != nil {
+		if errors.Is(err, ErrFileNotFound) {
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy tệp cấp Platform", nil)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể chuyển tệp vào thùng rác", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{
+		"deleted_file_id": fileID,
+		"retention_days":  TrashRetentionDays(),
+	})
+}

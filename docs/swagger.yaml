@@ -4194,6 +4194,151 @@ paths:
       summary: Đổi mật khẩu tài khoản hiện tại
       tags:
       - Platform Auth
+  /v1/platform/media:
+    get:
+      parameters:
+      - description: Lọc theo thư mục con
+        in: query
+        name: folder
+        type: string
+      - description: Trang
+        in: query
+        name: page
+        type: integer
+      - description: Số lượng mỗi trang
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessListResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/media.StoredFile'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Danh sách tệp media cấp Platform (không gắn org_id)
+      tags:
+      - Platform Media
+  /v1/platform/media/{file_id}:
+    delete:
+      deprecated: true
+      description: Hạn chế sử dụng — ưu tiên dùng DELETE /v1/platform/media/by-url
+        với access_url.
+      parameters:
+      - description: File ID
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: '[Hạn chế sử dụng] Chuyển tệp cấp Platform vào thùng rác theo file_id'
+      tags:
+      - Platform Media
+  /v1/platform/media/by-url:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Đường dẫn access_url của tệp cấp Platform cần xóa
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/media.DeleteByURLInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa tệp cấp Platform theo access_url (chuyển vào thùng rác, tự xóa
+        khỏi R2 sau N ngày)
+      tags:
+      - Platform Media
+  /v1/platform/media/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Tệp ảnh (JPEG, PNG, WEBP, GIF) hoặc tài liệu (PDF, DOC, DOCX,
+          XLS, XLSX; tối đa 25 MB)
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: 'Thư mục con (VD: avatars, branding, docs; mặc định: general)'
+        in: formData
+        name: folder
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/media.StoredFile'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload ảnh hoặc tài liệu cấp Platform (không cần org_id, lưu tại platform/{folder}/...)
+      tags:
+      - Platform Media
   /v1/platform/menus/tree:
     get:
       produces:

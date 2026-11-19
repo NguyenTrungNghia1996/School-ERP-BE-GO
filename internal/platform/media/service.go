@@ -48,12 +48,12 @@ var (
 )
 
 const (
-	defaultMaxFileBytes        int64 = 25 * 1024 * 1024       // 25 MB
-	defaultOrgQuotaBytes       int64 = 1 * 1024 * 1024 * 1024 // 1 GB fallback if package has no quota
-	defaultPresignDuration           = 15 * time.Minute
-	defaultTrashRetentionDays        = 30
-	defaultPurgeInterval             = 60 * time.Minute
-	defaultPurgeBatchSize            = 100
+	defaultMaxFileBytes       int64 = 25 * 1024 * 1024       // 25 MB
+	defaultOrgQuotaBytes      int64 = 1 * 1024 * 1024 * 1024 // 1 GB fallback if package has no quota
+	defaultPresignDuration          = 15 * time.Minute
+	defaultTrashRetentionDays       = 30
+	defaultPurgeInterval            = 60 * time.Minute
+	defaultPurgeBatchSize           = 100
 )
 
 // QuotaProvider resolves an organization's effective storage limit in bytes.
@@ -131,6 +131,12 @@ func SanitizeFolder(folder string) (string, error) {
 		return "", ErrInvalidFolder
 	}
 	return f, nil
+}
+
+// BuildPlatformObjectKey builds a platform-level S3/R2 object key under platform/{folder}/{YYYY}/{MM}/{file_id}{ext}.
+func BuildPlatformObjectKey(folder string, fileID uuid.UUID, ext string, now time.Time) string {
+	return fmt.Sprintf("platform/%s/%04d/%02d/%s%s",
+		folder, now.Year(), int(now.Month()), fileID.String(), ext)
 }
 
 // BuildOrgObjectKey builds a tenant-isolated S3/R2 object key under orgs/{org_id}/...
@@ -307,9 +313,10 @@ func (s *Service) UploadImage(ctx context.Context, input UploadImageInput) (*Sto
 		cleanName = fileID.String() + ext
 	}
 
+	orgIDCopy := input.OrganizationID
 	record := &StoredFile{
 		ID:              fileID,
-		OrganizationID:  input.OrganizationID,
+		OrganizationID:  &orgIDCopy,
 		SchoolID:        input.SchoolID,
 		UploadedBy:      &input.UploadedBy,
 		Folder:          folder,
@@ -568,6 +575,220 @@ func (s *Service) DeleteFileByAccessURLForActor(ctx context.Context, orgID uuid.
 	}
 
 	if err := s.DeleteFileForActor(ctx, orgID, file.ID, actorID, actorType, ip, ua); err != nil {
+		return uuid.Nil, "", err
+	}
+	return file.ID, file.ObjectKey, nil
+}
+
+// ExtractPlatformObjectKeyFromAccessURL extracts the canonical platform object_key ("platform/...") from an access URL.
+func ExtractPlatformObjectKeyFromAccessURL(accessURL string) (string, error) {
+	raw := strings.TrimSpace(accessURL)
+	if raw == "" {
+		return "", ErrInvalidAccessURL
+	}
+
+	pathPart := raw
+	if strings.Contains(raw, "://") {
+		u, err := url.Parse(raw)
+		if err != nil {
+			return "", ErrInvalidAccessURL
+		}
+		pathPart = u.Path
+	} else if idx := strings.IndexAny(pathPart, "?#"); idx >= 0 {
+		pathPart = pathPart[:idx]
+	}
+
+	if decoded, err := url.PathUnescape(pathPart); err == nil {
+		pathPart = decoded
+	}
+
+	idx := strings.Index(pathPart, "platform/")
+	if idx < 0 {
+		return "", ErrInvalidAccessURL
+	}
+	objectKey := strings.TrimLeft(pathPart[idx:], "/")
+	if objectKey == "" || strings.Contains(objectKey, "..") {
+		return "", ErrInvalidAccessURL
+	}
+	return objectKey, nil
+}
+
+type UploadPlatformFileInput struct {
+	UploadedBy   uuid.UUID
+	Folder       string
+	OriginalName string
+	Data         []byte
+	IPAddress    string
+	UserAgent    string
+}
+
+// UploadPlatformFile uploads a platform-level image/document (no org_id) under platform/{folder}/YYYY/MM/{file_id}{ext}.
+func (s *Service) UploadPlatformFile(ctx context.Context, input UploadPlatformFileInput) (*StoredFile, error) {
+	if s.store == nil || !s.store.IsConfigured() {
+		return nil, ErrStorageNotConfigured
+	}
+
+	mimeType, ext, err := ValidateFilePayload(input.Data, input.OriginalName)
+	if err != nil {
+		return nil, err
+	}
+
+	folder, err := SanitizeFolder(input.Folder)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	fileID := uuid.New()
+	objectKey := BuildPlatformObjectKey(folder, fileID, ext, now)
+
+	if err := s.store.PutObject(ctx, objectKey, mimeType, input.Data); err != nil {
+		return nil, err
+	}
+
+	var publicURLPtr *string
+	if pub := s.store.PublicURL(objectKey); pub != "" {
+		publicURLPtr = &pub
+	}
+
+	cleanName := filepath.Base(strings.TrimSpace(input.OriginalName))
+	if cleanName == "" || cleanName == "." {
+		cleanName = fileID.String() + ext
+	}
+
+	fileSize := int64(len(input.Data))
+	record := &StoredFile{
+		ID:              fileID,
+		OrganizationID:  nil,
+		UploadedBy:      &input.UploadedBy,
+		Folder:          folder,
+		ObjectKey:       objectKey,
+		OriginalName:    cleanName,
+		MimeType:        mimeType,
+		SizeBytes:       fileSize,
+		StorageProvider: s.store.Provider(),
+		Bucket:          s.store.Bucket(),
+		PublicURL:       publicURLPtr,
+		CreatedAt:       now,
+	}
+
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(record).Error; err != nil {
+			return err
+		}
+		if s.auditor != nil {
+			return s.auditor.Log(tx, audit.AuditEntry{
+				ActorType:    "PLATFORM",
+				ActorID:      &input.UploadedBy,
+				Action:       "PLATFORM_MEDIA_UPLOADED",
+				ResourceType: "STORED_FILE",
+				ResourceID:   &record.ID,
+				AfterData: map[string]any{
+					"object_key": objectKey,
+					"size_bytes": fileSize,
+					"mime_type":  mimeType,
+					"folder":     folder,
+				},
+				IPAddress: input.IPAddress,
+				UserAgent: input.UserAgent,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		_ = s.store.DeleteObject(context.Background(), objectKey)
+		return nil, err
+	}
+
+	record.AccessURL = s.resolveAccessURL(ctx, record)
+	return record, nil
+}
+
+// ListPlatformFiles lists active platform-level files (organization_id IS NULL).
+func (s *Service) ListPlatformFiles(ctx context.Context, folder string, page, limit int) ([]StoredFile, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	q := s.db.WithContext(ctx).Model(&StoredFile{}).Where("organization_id IS NULL")
+	if strings.TrimSpace(folder) != "" {
+		cleanFolder, err := SanitizeFolder(folder)
+		if err != nil {
+			return nil, 0, err
+		}
+		q = q.Where("folder = ?", cleanFolder)
+	}
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var files []StoredFile
+	offset := (page - 1) * limit
+	if err := q.Order("created_at DESC").Offset(offset).Limit(limit).Find(&files).Error; err != nil {
+		return nil, 0, err
+	}
+
+	for i := range files {
+		files[i].AccessURL = s.resolveAccessURL(ctx, &files[i])
+	}
+	return files, total, nil
+}
+
+// DeletePlatformFile moves a platform-level file (organization_id IS NULL) to Trash.
+func (s *Service) DeletePlatformFile(ctx context.Context, fileID, actorID uuid.UUID, ip, ua string) error {
+	var file StoredFile
+	if err := s.db.WithContext(ctx).First(&file, "id = ? AND organization_id IS NULL", fileID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrFileNotFound
+		}
+		return err
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&file).Error; err != nil {
+			return err
+		}
+		if s.auditor != nil {
+			return s.auditor.Log(tx, audit.AuditEntry{
+				ActorType:    "PLATFORM",
+				ActorID:      &actorID,
+				Action:       "PLATFORM_MEDIA_TRASHED",
+				ResourceType: "STORED_FILE",
+				ResourceID:   &file.ID,
+				BeforeData: map[string]any{
+					"object_key":     file.ObjectKey,
+					"size_bytes":     file.SizeBytes,
+					"retention_days": TrashRetentionDays(),
+				},
+				IPAddress: ip,
+				UserAgent: ua,
+			})
+		}
+		return nil
+	})
+}
+
+// DeletePlatformFileByAccessURL resolves a platform-level file by its access_url and moves it to Trash.
+func (s *Service) DeletePlatformFileByAccessURL(ctx context.Context, accessURL string, actorID uuid.UUID, ip, ua string) (uuid.UUID, string, error) {
+	objectKey, err := ExtractPlatformObjectKeyFromAccessURL(accessURL)
+	if err != nil {
+		return uuid.Nil, "", err
+	}
+
+	var file StoredFile
+	if err := s.db.WithContext(ctx).First(&file, "object_key = ? AND organization_id IS NULL", objectKey).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return uuid.Nil, "", ErrFileNotFound
+		}
+		return uuid.Nil, "", err
+	}
+
+	if err := s.DeletePlatformFile(ctx, file.ID, actorID, ip, ua); err != nil {
 		return uuid.Nil, "", err
 	}
 	return file.ID, file.ObjectKey, nil

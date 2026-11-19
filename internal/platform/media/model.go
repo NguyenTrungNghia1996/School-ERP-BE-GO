@@ -20,7 +20,7 @@ func (OrganizationStorageUsage) TableName() string {
 
 type StoredFile struct {
 	ID              uuid.UUID      `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	OrganizationID  uuid.UUID      `json:"organization_id" gorm:"column:organization_id;type:uuid;not null"`
+	OrganizationID  *uuid.UUID     `json:"organization_id,omitempty" gorm:"column:organization_id;type:uuid"`
 	SchoolID        *uuid.UUID     `json:"school_id,omitempty" gorm:"column:school_id;type:uuid"`
 	UploadedBy      *uuid.UUID     `json:"uploaded_by,omitempty" gorm:"column:uploaded_by;type:uuid"`
 	Folder          string         `json:"folder" gorm:"column:folder;type:varchar(100);not null;default:'general'"`
