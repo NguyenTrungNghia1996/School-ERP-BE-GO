@@ -163,10 +163,14 @@ func RegisterRoutes(api fiber.Router) {
 	// Nhóm 6: Audit Logs
 	protected.Get("/audit-logs", middleware.RequirePlatformPermission("platform:audit:read"), auditHandler.List)
 
-	// Nhóm 7: Lưu trữ ảnh S3 / Cloudflare R2 & Dung lượng theo từng đơn vị
+	// Nhóm 7: Lưu trữ ảnh/tài liệu S3 / Cloudflare R2 & Dung lượng theo từng đơn vị
 	protected.Get("/organizations/:org_id/storage/usage", middleware.RequirePlatformPermission("platform:media:read"), mediaHandler.GetUsage)
 	protected.Get("/organizations/:org_id/media", middleware.RequirePlatformPermission("platform:media:read"), mediaHandler.ListFiles)
+	protected.Get("/organizations/:org_id/media/trash", middleware.RequirePlatformPermission("platform:media:read"), mediaHandler.ListTrash)
 	protected.Get("/organizations/:org_id/media/:file_id/url", middleware.RequirePlatformPermission("platform:media:read"), mediaHandler.GetFileURL)
 	protected.Post("/organizations/:org_id/media/upload", middleware.RequirePlatformPermission("platform:media:manage"), mediaHandler.UploadImage)
+	protected.Post("/organizations/:org_id/media/:file_id/restore", middleware.RequirePlatformPermission("platform:media:manage"), mediaHandler.RestoreFile)
+	protected.Delete("/organizations/:org_id/media/by-url", middleware.RequirePlatformPermission("platform:media:manage"), mediaHandler.DeleteFileByURL)
+	protected.Delete("/organizations/:org_id/media/:file_id/permanent", middleware.RequirePlatformPermission("platform:media:manage"), mediaHandler.PurgeFile)
 	protected.Delete("/organizations/:org_id/media/:file_id", middleware.RequirePlatformPermission("platform:media:manage"), mediaHandler.DeleteFile)
 }

@@ -34,7 +34,7 @@ func getTenantActorUUID(c *fiber.Ctx) uuid.UUID {
 // @Tags Tenant Menu
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Success 200 {object} response.SuccessResponse{data=[]DynamicMenuNode}
 // @Failure 401 {object} response.ErrorResponse
 // @Failure 403 {object} response.ErrorResponse
@@ -62,7 +62,7 @@ func (h *Handler) GetManageTree(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param body body CustomizeMenusInput true "Danh sách cấu hình menu"
 // @Success 200 {object} response.SuccessResponse
 // @Failure 400 {object} response.ErrorResponse
@@ -93,7 +93,7 @@ func (h *Handler) CustomizeMenus(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param body body CreateCustomMenuInput true "Thông tin menu riêng"
 // @Success 201 {object} response.SuccessResponse{data=OrganizationMenuConfig}
 // @Failure 400 {object} response.ErrorResponse
@@ -124,7 +124,7 @@ func (h *Handler) CreateCustomItem(c *fiber.Ctx) error {
 // @Tags Tenant Menu
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Success 200 {object} response.SuccessResponse{data=[]EntitledRouteItem}
 // @Failure 403 {object} response.ErrorResponse
 // @Router /v1/menus/routes [get]
@@ -150,7 +150,7 @@ func (h *Handler) ListEntitledRoutes(c *fiber.Ctx) error {
 // @Tags Tenant Menu
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param id path string true "Custom Menu Config ID"
 // @Success 200 {object} response.SuccessResponse
 // @Failure 400 {object} response.ErrorResponse

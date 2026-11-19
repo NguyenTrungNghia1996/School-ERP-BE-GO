@@ -122,10 +122,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -215,10 +214,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "description": "school_id",
@@ -281,10 +279,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -335,10 +332,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -420,10 +416,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -495,10 +490,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -565,10 +559,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -638,10 +631,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -693,10 +685,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "description": "Thông tin vai trò",
@@ -768,10 +759,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -845,10 +835,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -909,10 +898,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -972,10 +960,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -1033,6 +1020,133 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/media/by-url": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Media"
+                ],
+                "summary": "Xóa tệp của Đơn vị theo access_url (chuyển vào thùng rác, hoàn dung lượng DB, tự xóa khỏi R2 sau N ngày)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Đường dẫn access_url của tệp cần xóa",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/media.DeleteByURLInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/media/trash": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Media"
+                ],
+                "summary": "Danh sách tệp đang nằm trong thùng rác của Đơn vị hiện tại",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Trang",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Số lượng mỗi trang",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessListResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/media.StoredFile"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/media/upload": {
             "post": {
                 "security": [
@@ -1053,10 +1167,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -1143,20 +1256,21 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Hạn chế sử dụng — ưu tiên dùng DELETE /v1/media/by-url với access_url.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Tenant Media"
                 ],
-                "summary": "Xóa ảnh của Đơn vị khỏi S3/R2 và hoàn lại dung lượng vào DB",
+                "summary": "[Hạn chế sử dụng] Chuyển tệp của Đơn vị vào thùng rác theo file_id",
+                "deprecated": true,
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -1194,6 +1308,144 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/media/{file_id}/permanent": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Media"
+                ],
+                "summary": "Xóa vĩnh viễn tệp trong thùng rác của Đơn vị khỏi R2/S3 ngay lập tức",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "File ID",
+                        "name": "file_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/media/{file_id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Media"
+                ],
+                "summary": "Khôi phục tệp của Đơn vị từ thùng rác (trước khi bị dọn khỏi R2)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "File ID",
+                        "name": "file_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/media.StoredFile"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/media/{file_id}/url": {
             "get": {
                 "security": [
@@ -1211,10 +1463,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -1278,10 +1529,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "description": "Thông tin menu riêng",
@@ -1344,10 +1594,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -1399,10 +1648,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "description": "Danh sách cấu hình menu",
@@ -1453,10 +1701,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -1513,10 +1760,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -1567,10 +1813,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -1619,10 +1864,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "description": "Thông tin cập nhật",
@@ -4268,6 +4512,129 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/platform/organizations/{org_id}/media/by-url": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Platform Media"
+                ],
+                "summary": "Xóa tệp theo access_url (chuyển vào thùng rác, hoàn dung lượng DB, tự xóa khỏi R2 sau N ngày)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Organization ID",
+                        "name": "org_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Đường dẫn access_url của tệp cần xóa",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/media.DeleteByURLInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/platform/organizations/{org_id}/media/trash": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Platform Media"
+                ],
+                "summary": "Danh sách tệp đang nằm trong thùng rác của Tổ chức (chưa bị dọn khỏi R2)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Organization ID",
+                        "name": "org_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Trang",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Số lượng mỗi trang",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessListResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/media.StoredFile"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/platform/organizations/{org_id}/media/upload": {
             "post": {
                 "security": [
@@ -4366,13 +4733,15 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Hạn chế sử dụng — ưu tiên dùng DELETE /v1/platform/organizations/{org_id}/media/by-url với access_url.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Platform Media"
                 ],
-                "summary": "Xóa ảnh khỏi S3/R2 và hoàn lại dung lượng vào DB của Tổ chức",
+                "summary": "[Hạn chế sử dụng] Chuyển tệp vào thùng rác theo file_id",
+                "deprecated": true,
                 "parameters": [
                     {
                         "type": "string",
@@ -4404,6 +4773,134 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/platform/organizations/{org_id}/media/{file_id}/permanent": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Platform Media"
+                ],
+                "summary": "Xóa vĩnh viễn tệp trong thùng rác khỏi R2/S3 ngay lập tức",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Organization ID",
+                        "name": "org_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "File ID",
+                        "name": "file_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/platform/organizations/{org_id}/media/{file_id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Platform Media"
+                ],
+                "summary": "Khôi phục tệp từ thùng rác (trước khi bị dọn khỏi R2)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Organization ID",
+                        "name": "org_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "File ID",
+                        "name": "file_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/media.StoredFile"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorResponse"
                         }
@@ -6673,10 +7170,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -6728,10 +7224,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "description": "Thông tin trường mới",
@@ -6803,10 +7298,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "type": "string",
@@ -6876,10 +7370,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Subdomain của Đơn vị",
+                        "description": "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)",
                         "name": "X-Tenant-Subdomain",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -8549,6 +9042,15 @@ const docTemplate = `{
                 }
             }
         },
+        "media.DeleteByURLInput": {
+            "type": "object",
+            "properties": {
+                "access_url": {
+                    "type": "string",
+                    "example": "https://cdn.nghia196.qzz.io/orgs/7f284a1b-bec8-41d4-9ed6-f6de5252ff06/logos/2026/11/550e8400-e29b-41d4-a716-446655440000.png"
+                }
+            }
+        },
         "media.MediaFileURLOutput": {
             "type": "object",
             "properties": {
@@ -8611,6 +9113,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "deleted_at": {
+                    "type": "string"
+                },
                 "folder": {
                     "type": "string"
                 },
@@ -8630,6 +9135,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "public_url": {
+                    "type": "string"
+                },
+                "purged_at": {
                     "type": "string"
                 },
                 "school_id": {

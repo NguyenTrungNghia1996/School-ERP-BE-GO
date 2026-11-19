@@ -6,7 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,6 +31,7 @@ var (
 	ErrInvalidFileType      = ErrInvalidImageType
 	ErrFileTooLarge         = errors.New("tệp tải lên vượt quá dung lượng tối đa cho phép")
 	ErrInvalidFolder        = errors.New("invalid folder name")
+	ErrInvalidAccessURL     = errors.New("access_url không hợp lệ")
 	ErrSchoolNotFound       = errors.New("school not found in organization")
 	ErrStorageQuotaExceeded = errors.New("organization storage quota exceeded")
 
@@ -45,9 +48,12 @@ var (
 )
 
 const (
-	defaultMaxFileBytes    int64 = 25 * 1024 * 1024       // 25 MB
-	defaultOrgQuotaBytes   int64 = 1 * 1024 * 1024 * 1024 // 1 GB fallback if package has no quota
-	defaultPresignDuration       = 15 * time.Minute
+	defaultMaxFileBytes        int64 = 25 * 1024 * 1024       // 25 MB
+	defaultOrgQuotaBytes       int64 = 1 * 1024 * 1024 * 1024 // 1 GB fallback if package has no quota
+	defaultPresignDuration           = 15 * time.Minute
+	defaultTrashRetentionDays        = 30
+	defaultPurgeInterval             = 60 * time.Minute
+	defaultPurgeBatchSize            = 100
 )
 
 // QuotaProvider resolves an organization's effective storage limit in bytes.
@@ -94,6 +100,25 @@ func fallbackQuotaBytes() int64 {
 		}
 	}
 	return defaultOrgQuotaBytes
+}
+
+// TrashRetentionDays returns how many days trashed files are kept on R2 before permanent purge.
+func TrashRetentionDays() int {
+	if raw := strings.TrimSpace(os.Getenv("STORAGE_TRASH_RETENTION_DAYS")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			return v
+		}
+	}
+	return defaultTrashRetentionDays
+}
+
+func purgeInterval() time.Duration {
+	if raw := strings.TrimSpace(os.Getenv("STORAGE_PURGE_INTERVAL_MINUTES")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			return time.Duration(v) * time.Minute
+		}
+	}
+	return defaultPurgeInterval
 }
 
 // SanitizeFolder normalizes and validates a sub-folder path inside an organization's root directory.
@@ -487,10 +512,70 @@ func (s *Service) DeleteFile(ctx context.Context, orgID, fileID, actorID uuid.UU
 	return s.DeleteFileForActor(ctx, orgID, fileID, actorID, "PLATFORM", ip, ua)
 }
 
-func (s *Service) DeleteFileForActor(ctx context.Context, orgID, fileID, actorID uuid.UUID, actorType, ip, ua string) error {
-	if s.store == nil || !s.store.IsConfigured() {
-		return ErrStorageNotConfigured
+// ExtractObjectKeyFromAccessURL extracts the canonical tenant object_key ("orgs/...") from a public or presigned URL.
+func ExtractObjectKeyFromAccessURL(accessURL string) (string, error) {
+	raw := strings.TrimSpace(accessURL)
+	if raw == "" {
+		return "", ErrInvalidAccessURL
 	}
+
+	pathPart := raw
+	if strings.Contains(raw, "://") {
+		u, err := url.Parse(raw)
+		if err != nil {
+			return "", ErrInvalidAccessURL
+		}
+		pathPart = u.Path
+	} else {
+		if idx := strings.IndexAny(pathPart, "?#"); idx >= 0 {
+			pathPart = pathPart[:idx]
+		}
+	}
+
+	if decoded, err := url.PathUnescape(pathPart); err == nil {
+		pathPart = decoded
+	}
+
+	idx := strings.Index(pathPart, "orgs/")
+	if idx < 0 {
+		return "", ErrInvalidAccessURL
+	}
+	objectKey := strings.TrimLeft(pathPart[idx:], "/")
+	if objectKey == "" || strings.Contains(objectKey, "..") {
+		return "", ErrInvalidAccessURL
+	}
+	return objectKey, nil
+}
+
+// DeleteFileByAccessURLForActor resolves a file by its access_url (within orgID) and moves it to Trash.
+func (s *Service) DeleteFileByAccessURLForActor(ctx context.Context, orgID uuid.UUID, accessURL string, actorID uuid.UUID, actorType, ip, ua string) (uuid.UUID, string, error) {
+	objectKey, err := ExtractObjectKeyFromAccessURL(accessURL)
+	if err != nil {
+		return uuid.Nil, "", err
+	}
+
+	expectedPrefix := fmt.Sprintf("orgs/%s/", orgID.String())
+	if !strings.HasPrefix(objectKey, expectedPrefix) {
+		return uuid.Nil, "", ErrFileNotFound
+	}
+
+	var file StoredFile
+	if err := s.db.WithContext(ctx).First(&file, "object_key = ? AND organization_id = ?", objectKey, orgID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return uuid.Nil, "", ErrFileNotFound
+		}
+		return uuid.Nil, "", err
+	}
+
+	if err := s.DeleteFileForActor(ctx, orgID, file.ID, actorID, actorType, ip, ua); err != nil {
+		return uuid.Nil, "", err
+	}
+	return file.ID, file.ObjectKey, nil
+}
+
+// DeleteFileForActor moves a file to Trash (soft-delete in DB + frees org quota).
+// The physical object on R2/S3 is retained for STORAGE_TRASH_RETENTION_DAYS before the cleanup worker purges it.
+func (s *Service) DeleteFileForActor(ctx context.Context, orgID, fileID, actorID uuid.UUID, actorType, ip, ua string) error {
 	actorType = strings.ToUpper(strings.TrimSpace(actorType))
 	if actorType == "" {
 		actorType = "PLATFORM"
@@ -501,10 +586,6 @@ func (s *Service) DeleteFileForActor(ctx context.Context, orgID, fileID, actorID
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrFileNotFound
 		}
-		return err
-	}
-
-	if err := s.store.DeleteObject(ctx, file.ObjectKey); err != nil {
 		return err
 	}
 
@@ -529,7 +610,172 @@ func (s *Service) DeleteFileForActor(ctx context.Context, orgID, fileID, actorID
 				ActorType:      actorType,
 				ActorID:        &actorID,
 				OrganizationID: &orgID,
-				Action:         "MEDIA_IMAGE_DELETED",
+				Action:         "MEDIA_FILE_TRASHED",
+				ResourceType:   "STORED_FILE",
+				ResourceID:     &file.ID,
+				BeforeData: map[string]any{
+					"object_key":     file.ObjectKey,
+					"size_bytes":     file.SizeBytes,
+					"retention_days": TrashRetentionDays(),
+				},
+				IPAddress: ip,
+				UserAgent: ua,
+			})
+		}
+		return nil
+	})
+}
+
+// ListTrash lists soft-deleted files that have not been physically purged from R2/S3 yet.
+func (s *Service) ListTrash(ctx context.Context, orgID uuid.UUID, page, limit int) ([]StoredFile, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	q := s.db.WithContext(ctx).Unscoped().Model(&StoredFile{}).
+		Where("organization_id = ? AND deleted_at IS NOT NULL AND purged_at IS NULL", orgID)
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var files []StoredFile
+	offset := (page - 1) * limit
+	if err := q.Order("deleted_at DESC").Offset(offset).Limit(limit).Find(&files).Error; err != nil {
+		return nil, 0, err
+	}
+
+	for i := range files {
+		if files[i].DeletedAt.Valid {
+			t := files[i].DeletedAt.Time
+			files[i].TrashedAt = &t
+		}
+		files[i].AccessURL = s.resolveAccessURL(ctx, &files[i])
+	}
+	return files, total, nil
+}
+
+// RestoreFileForActor restores a file from Trash (before it is purged from R2) and re-checks org storage quota.
+func (s *Service) RestoreFileForActor(ctx context.Context, orgID, fileID, actorID uuid.UUID, actorType, ip, ua string) (*StoredFile, error) {
+	actorType = strings.ToUpper(strings.TrimSpace(actorType))
+	if actorType == "" {
+		actorType = "PLATFORM"
+	}
+
+	var file StoredFile
+	if err := s.db.WithContext(ctx).Unscoped().
+		First(&file, "id = ? AND organization_id = ? AND deleted_at IS NOT NULL AND purged_at IS NULL", fileID, orgID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFileNotFound
+		}
+		return nil, err
+	}
+
+	quotaBytes := s.resolveOrgQuotaBytes(ctx, orgID)
+	now := time.Now().UTC()
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(`
+			INSERT INTO organization_storage_usages (organization_id, used_bytes, file_count, updated_at)
+			VALUES (?, 0, 0, NOW())
+			ON CONFLICT (organization_id) DO NOTHING
+		`, orgID).Error; err != nil {
+			return err
+		}
+
+		var usage OrganizationStorageUsage
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&usage, "organization_id = ?", orgID).Error; err != nil {
+			return err
+		}
+		if usage.UsedBytes+file.SizeBytes > quotaBytes {
+			return ErrStorageQuotaExceeded
+		}
+
+		if err := tx.Unscoped().Model(&StoredFile{}).
+			Where("id = ? AND organization_id = ?", file.ID, orgID).
+			Update("deleted_at", nil).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&OrganizationStorageUsage{}).
+			Where("organization_id = ?", orgID).
+			Updates(map[string]any{
+				"used_bytes": gorm.Expr("used_bytes + ?", file.SizeBytes),
+				"file_count": gorm.Expr("file_count + 1"),
+				"updated_at": now,
+			}).Error; err != nil {
+			return err
+		}
+
+		if s.auditor != nil {
+			return s.auditor.Log(tx, audit.AuditEntry{
+				ActorType:      actorType,
+				ActorID:        &actorID,
+				OrganizationID: &orgID,
+				Action:         "MEDIA_FILE_RESTORED",
+				ResourceType:   "STORED_FILE",
+				ResourceID:     &file.ID,
+				AfterData: map[string]any{
+					"object_key": file.ObjectKey,
+					"size_bytes": file.SizeBytes,
+				},
+				IPAddress: ip,
+				UserAgent: ua,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	file.DeletedAt = gorm.DeletedAt{}
+	file.TrashedAt = nil
+	file.AccessURL = s.resolveAccessURL(ctx, &file)
+	return &file, nil
+}
+
+// PurgeFileForActor permanently removes a trashed file from R2/S3 immediately and marks purged_at.
+func (s *Service) PurgeFileForActor(ctx context.Context, orgID, fileID, actorID uuid.UUID, actorType, ip, ua string) error {
+	if s.store == nil || !s.store.IsConfigured() {
+		return ErrStorageNotConfigured
+	}
+	actorType = strings.ToUpper(strings.TrimSpace(actorType))
+	if actorType == "" {
+		actorType = "PLATFORM"
+	}
+
+	var file StoredFile
+	if err := s.db.WithContext(ctx).Unscoped().
+		First(&file, "id = ? AND organization_id = ? AND deleted_at IS NOT NULL AND purged_at IS NULL", fileID, orgID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrFileNotFound
+		}
+		return err
+	}
+
+	if err := s.store.DeleteObject(ctx, file.ObjectKey); err != nil {
+		return err
+	}
+
+	now := time.Now().UTC()
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Model(&StoredFile{}).
+			Where("id = ? AND organization_id = ?", file.ID, orgID).
+			Update("purged_at", now).Error; err != nil {
+			return err
+		}
+		if s.auditor != nil {
+			return s.auditor.Log(tx, audit.AuditEntry{
+				ActorType:      actorType,
+				ActorID:        &actorID,
+				OrganizationID: &orgID,
+				Action:         "MEDIA_FILE_PURGED",
 				ResourceType:   "STORED_FILE",
 				ResourceID:     &file.ID,
 				BeforeData: map[string]any{
@@ -542,6 +788,97 @@ func (s *Service) DeleteFileForActor(ctx context.Context, orgID, fileID, actorID
 		}
 		return nil
 	})
+}
+
+// PurgeExpiredTrash physically deletes trashed files older than retentionDays from R2/S3 and marks purged_at.
+func (s *Service) PurgeExpiredTrash(ctx context.Context, retentionDays, batchSize int) (int, error) {
+	if s.db == nil || s.store == nil || !s.store.IsConfigured() {
+		return 0, nil
+	}
+	if retentionDays <= 0 {
+		retentionDays = TrashRetentionDays()
+	}
+	if batchSize <= 0 {
+		batchSize = defaultPurgeBatchSize
+	}
+
+	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
+	var expired []StoredFile
+	if err := s.db.WithContext(ctx).Unscoped().
+		Where("deleted_at IS NOT NULL AND deleted_at <= ? AND purged_at IS NULL", cutoff).
+		Order("deleted_at ASC").
+		Limit(batchSize).
+		Find(&expired).Error; err != nil {
+		return 0, err
+	}
+
+	purged := 0
+	for _, file := range expired {
+		if err := s.store.DeleteObject(ctx, file.ObjectKey); err != nil {
+			log.Printf("⚠️ Lỗi dọn file %s (%s) trên R2/S3: %v\n", file.ID, file.ObjectKey, err)
+			continue
+		}
+		now := time.Now().UTC()
+		if err := s.db.WithContext(ctx).Unscoped().Model(&StoredFile{}).
+			Where("id = ?", file.ID).
+			Update("purged_at", now).Error; err != nil {
+			log.Printf("⚠️ Đã xóa object %s trên R2 nhưng lỗi cập nhật purged_at: %v\n", file.ObjectKey, err)
+			continue
+		}
+		purged++
+	}
+	return purged, nil
+}
+
+// StartTrashCleanupWorker launches a background goroutine that periodically purges expired trashed files from R2/S3.
+func (s *Service) StartTrashCleanupWorker(ctx context.Context) {
+	if s.db == nil || s.store == nil || !s.store.IsConfigured() {
+		return
+	}
+	retention := TrashRetentionDays()
+	interval := purgeInterval()
+	log.Printf("🧹 Đã bật Media Trash Cleanup Worker (giữ thùng rác %d ngày, quét mỗi %s)\n", retention, interval)
+
+	go func() {
+		runOnce := func() {
+			runCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+			defer cancel()
+			for {
+				n, err := s.PurgeExpiredTrash(runCtx, retention, defaultPurgeBatchSize)
+				if err != nil {
+					log.Printf("⚠️ Media Trash Cleanup Worker lỗi: %v\n", err)
+					return
+				}
+				if n > 0 {
+					log.Printf("🧹 Media Trash Cleanup Worker đã xóa vĩnh viễn %d tệp quá hạn khỏi R2/S3\n", n)
+				}
+				if n < defaultPurgeBatchSize {
+					return
+				}
+			}
+		}
+
+		// Chạy 1 lượt ngắn sau khi khởi động 15s, sau đó chạy định kỳ theo interval
+		timer := time.NewTimer(15 * time.Second)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+			runOnce()
+		}
+
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				runOnce()
+			}
+		}
+	}()
 }
 
 func (s *Service) resolveAccessURL(ctx context.Context, file *StoredFile) string {

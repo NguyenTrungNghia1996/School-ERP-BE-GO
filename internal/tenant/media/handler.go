@@ -43,7 +43,7 @@ func getTenantActorUUID(c *fiber.Ctx) uuid.UUID {
 // @Accept mpfd
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param X-School-ID header string false "School ID ngữ cảnh hiện tại"
 // @Param file formData file true "Tệp ảnh (JPEG, PNG, WEBP, GIF) hoặc tài liệu (PDF, DOC, DOCX, XLS, XLSX; tối đa 25 MB)"
 // @Param folder formData string false "Thư mục con (VD: logos, avatars, students, documents; mặc định: general)"
@@ -131,7 +131,7 @@ func (h *Handler) UploadImage(c *fiber.Ctx) error {
 // @Tags Tenant Media
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Success 200 {object} response.SuccessResponse{data=media.StorageUsageOutput}
 // @Failure 403 {object} response.ErrorResponse
 // @Router /v1/storage/usage [get]
@@ -160,7 +160,7 @@ func (h *Handler) GetUsage(c *fiber.Ctx) error {
 // @Tags Tenant Media
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param folder query string false "Lọc theo thư mục con"
 // @Param page query int false "Trang"
 // @Param limit query int false "Số lượng mỗi trang"
@@ -200,7 +200,7 @@ func (h *Handler) ListFiles(c *fiber.Ctx) error {
 // @Tags Tenant Media
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param file_id path string true "File ID"
 // @Success 200 {object} response.SuccessResponse{data=media.MediaFileURLOutput}
 // @Failure 400 {object} response.ErrorResponse
@@ -236,11 +236,13 @@ func (h *Handler) GetFileURL(c *fiber.Ctx) error {
 }
 
 // DeleteFile godoc
-// @Summary Xóa ảnh của Đơn vị khỏi S3/R2 và hoàn lại dung lượng vào DB
+// @Summary [Hạn chế sử dụng] Chuyển tệp của Đơn vị vào thùng rác theo file_id
+// @Description Hạn chế sử dụng — ưu tiên dùng DELETE /v1/media/by-url với access_url.
+// @Deprecated
 // @Tags Tenant Media
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param file_id path string true "File ID"
 // @Success 200 {object} response.SuccessResponse
 // @Failure 400 {object} response.ErrorResponse
@@ -248,6 +250,7 @@ func (h *Handler) GetFileURL(c *fiber.Ctx) error {
 // @Failure 404 {object} response.ErrorResponse
 // @Router /v1/media/{file_id} [delete]
 func (h *Handler) DeleteFile(c *fiber.Ctx) error {
+	c.Set("Deprecation", "true")
 	orgID, _, err := parseTenantOrgID(c)
 	if err != nil {
 		return response.Error(c, fiber.StatusUnauthorized, response.ErrCodeUnauthorized, "Thiếu ngữ cảnh Đơn vị", nil)
@@ -265,13 +268,178 @@ func (h *Handler) DeleteFile(c *fiber.Ctx) error {
 	if err != nil {
 		switch {
 		case errors.Is(err, platformmedia.ErrFileNotFound):
-			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy tệp ảnh thuộc Đơn vị này", nil)
-		case errors.Is(err, platformmedia.ErrStorageNotConfigured):
-			return response.Error(c, fiber.StatusServiceUnavailable, response.ErrCodeStorageNotConfigured, "Dịch vụ lưu trữ S3/R2 chưa được cấu hình", nil)
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy tệp thuộc Đơn vị này", nil)
 		default:
-			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa ảnh", err.Error())
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể chuyển tệp vào thùng rác", err.Error())
 		}
 	}
 
-	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_file_id": fileID})
+	return response.Success(c, fiber.StatusOK, fiber.Map{
+		"deleted_file_id": fileID,
+		"retention_days":  platformmedia.TrashRetentionDays(),
+	})
+}
+
+// DeleteFileByURL godoc
+// @Summary Xóa tệp của Đơn vị theo access_url (chuyển vào thùng rác, hoàn dung lượng DB, tự xóa khỏi R2 sau N ngày)
+// @Tags Tenant Media
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
+// @Param body body media.DeleteByURLInput true "Đường dẫn access_url của tệp cần xóa"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/media/by-url [delete]
+func (h *Handler) DeleteFileByURL(c *fiber.Ctx) error {
+	orgID, _, err := parseTenantOrgID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, response.ErrCodeUnauthorized, "Thiếu ngữ cảnh Đơn vị", nil)
+	}
+
+	var body platformmedia.DeleteByURLInput
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu không hợp lệ", err.Error())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	fileID, objectKey, err := h.service.DeleteFileByAccessURLForActor(ctx, orgID, body.AccessURL, getTenantActorUUID(c), "TENANT", c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		switch {
+		case errors.Is(err, platformmedia.ErrInvalidAccessURL):
+			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, err.Error(), nil)
+		case errors.Is(err, platformmedia.ErrFileNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy tệp thuộc Đơn vị này", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa tệp theo access_url", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{
+		"deleted_file_id": fileID,
+		"object_key":      objectKey,
+		"retention_days":  platformmedia.TrashRetentionDays(),
+	})
+}
+
+// ListTrash godoc
+// @Summary Danh sách tệp đang nằm trong thùng rác của Đơn vị hiện tại
+// @Tags Tenant Media
+// @Produce json
+// @Security BearerAuth
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
+// @Param page query int false "Trang"
+// @Param limit query int false "Số lượng mỗi trang"
+// @Success 200 {object} response.SuccessListResponse{data=[]media.StoredFile}
+// @Failure 403 {object} response.ErrorResponse
+// @Router /v1/media/trash [get]
+func (h *Handler) ListTrash(c *fiber.Ctx) error {
+	orgID, _, err := parseTenantOrgID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, response.ErrCodeUnauthorized, "Thiếu ngữ cảnh Đơn vị", nil)
+	}
+
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 20)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	files, total, err := h.service.ListTrash(ctx, orgID, page, limit)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể tải danh sách thùng rác", err.Error())
+	}
+
+	return response.SuccessWithMeta(c, fiber.StatusOK, files, response.Meta{
+		Page:  page,
+		Limit: limit,
+		Total: total,
+	})
+}
+
+// RestoreFile godoc
+// @Summary Khôi phục tệp của Đơn vị từ thùng rác (trước khi bị dọn khỏi R2)
+// @Tags Tenant Media
+// @Produce json
+// @Security BearerAuth
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
+// @Param file_id path string true "File ID"
+// @Success 200 {object} response.SuccessResponse{data=media.StoredFile}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 413 {object} response.ErrorResponse
+// @Router /v1/media/{file_id}/restore [post]
+func (h *Handler) RestoreFile(c *fiber.Ctx) error {
+	orgID, _, err := parseTenantOrgID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, response.ErrCodeUnauthorized, "Thiếu ngữ cảnh Đơn vị", nil)
+	}
+
+	fileID, err := uuid.Parse(c.Params("file_id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID tệp không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	file, err := h.service.RestoreFileForActor(ctx, orgID, fileID, getTenantActorUUID(c), "TENANT", c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		switch {
+		case errors.Is(err, platformmedia.ErrFileNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy tệp trong thùng rác (hoặc đã bị xóa vĩnh viễn)", nil)
+		case errors.Is(err, platformmedia.ErrStorageQuotaExceeded):
+			return response.Error(c, fiber.StatusRequestEntityTooLarge, response.ErrCodeStorageQuotaExceeded, "Không đủ dung lượng gói dịch vụ để khôi phục tệp này", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể khôi phục tệp", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, file)
+}
+
+// PurgeFile godoc
+// @Summary Xóa vĩnh viễn tệp trong thùng rác của Đơn vị khỏi R2/S3 ngay lập tức
+// @Tags Tenant Media
+// @Produce json
+// @Security BearerAuth
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
+// @Param file_id path string true "File ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 503 {object} response.ErrorResponse
+// @Router /v1/media/{file_id}/permanent [delete]
+func (h *Handler) PurgeFile(c *fiber.Ctx) error {
+	orgID, _, err := parseTenantOrgID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, response.ErrCodeUnauthorized, "Thiếu ngữ cảnh Đơn vị", nil)
+	}
+
+	fileID, err := uuid.Parse(c.Params("file_id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID tệp không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := h.service.PurgeFileForActor(ctx, orgID, fileID, getTenantActorUUID(c), "TENANT", c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, platformmedia.ErrFileNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy tệp trong thùng rác", nil)
+		case errors.Is(err, platformmedia.ErrStorageNotConfigured):
+			return response.Error(c, fiber.StatusServiceUnavailable, response.ErrCodeStorageNotConfigured, "Dịch vụ lưu trữ S3/R2 chưa được cấu hình", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa vĩnh viễn tệp khỏi R2/S3", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"purged_file_id": fileID})
 }

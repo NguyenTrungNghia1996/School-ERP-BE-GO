@@ -103,7 +103,7 @@ func (h *Handler) Refresh(c *fiber.Ctx) error {
 // @Tags Tenant Auth
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param X-School-ID header string false "School ID đang chọn"
 // @Success 200 {object} response.SuccessResponse{data=TenantMeOutput}
 // @Failure 401 {object} response.ErrorResponse
@@ -131,7 +131,7 @@ func (h *Handler) Me(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param body body SwitchSchoolInput true "school_id"
 // @Success 200 {object} response.SuccessResponse{data=TenantLoginOutput}
 // @Failure 400 {object} response.ErrorResponse
@@ -165,7 +165,7 @@ func (h *Handler) SwitchSchool(c *fiber.Ctx) error {
 // @Tags Tenant Auth
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Success 200 {object} response.SuccessResponse
 // @Router /v1/auth/logout [post]
 func (h *Handler) Logout(c *fiber.Ctx) error {

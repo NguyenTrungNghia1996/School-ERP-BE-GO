@@ -1092,6 +1092,12 @@ definitions:
         example: LOCKED
         type: string
     type: object
+  media.DeleteByURLInput:
+    properties:
+      access_url:
+        example: https://cdn.nghia196.qzz.io/orgs/7f284a1b-bec8-41d4-9ed6-f6de5252ff06/logos/2026/11/550e8400-e29b-41d4-a716-446655440000.png
+        type: string
+    type: object
   media.MediaFileURLOutput:
     properties:
       expires_in_seconds:
@@ -1135,6 +1141,8 @@ definitions:
         type: string
       created_at:
         type: string
+      deleted_at:
+        type: string
       folder:
         type: string
       id:
@@ -1148,6 +1156,8 @@ definitions:
       original_name:
         type: string
       public_url:
+        type: string
+      purged_at:
         type: string
       school_id:
         type: string
@@ -1861,10 +1871,9 @@ paths:
   /v1/auth/logout:
     post:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       produces:
       - application/json
@@ -1917,10 +1926,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: school_id
         in: body
@@ -1956,10 +1964,9 @@ paths:
   /v1/iam/entitled-permissions:
     get:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       produces:
       - application/json
@@ -1987,10 +1994,9 @@ paths:
   /v1/iam/members:
     get:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: School ID đang chọn
         in: header
@@ -2039,10 +2045,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: School ID đang chọn
         in: header
@@ -2085,10 +2090,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: Membership ID
         in: path
@@ -2131,10 +2135,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: Membership ID
         in: path
@@ -2178,10 +2181,9 @@ paths:
   /v1/iam/roles:
     get:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       produces:
       - application/json
@@ -2210,10 +2212,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: Thông tin vai trò
         in: body
@@ -2253,10 +2254,9 @@ paths:
   /v1/iam/roles/{id}:
     delete:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: Role ID
         in: path
@@ -2295,10 +2295,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: Role ID
         in: path
@@ -2344,10 +2343,9 @@ paths:
   /v1/me:
     get:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: School ID đang chọn
         in: header
@@ -2381,10 +2379,9 @@ paths:
   /v1/media:
     get:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: Lọc theo thư mục con
         in: query
@@ -2427,11 +2424,12 @@ paths:
       - Tenant Media
   /v1/media/{file_id}:
     delete:
+      deprecated: true
+      description: Hạn chế sử dụng — ưu tiên dùng DELETE /v1/media/by-url với access_url.
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: File ID
         in: path
@@ -2459,16 +2457,100 @@ paths:
             $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Xóa ảnh của Đơn vị khỏi S3/R2 và hoàn lại dung lượng vào DB
+      summary: '[Hạn chế sử dụng] Chuyển tệp của Đơn vị vào thùng rác theo file_id'
+      tags:
+      - Tenant Media
+  /v1/media/{file_id}/permanent:
+    delete:
+      parameters:
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
+        in: header
+        name: X-Tenant-Subdomain
+        type: string
+      - description: File ID
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa vĩnh viễn tệp trong thùng rác của Đơn vị khỏi R2/S3 ngay lập tức
+      tags:
+      - Tenant Media
+  /v1/media/{file_id}/restore:
+    post:
+      parameters:
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
+        in: header
+        name: X-Tenant-Subdomain
+        type: string
+      - description: File ID
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/media.StoredFile'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Khôi phục tệp của Đơn vị từ thùng rác (trước khi bị dọn khỏi R2)
       tags:
       - Tenant Media
   /v1/media/{file_id}/url:
     get:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: File ID
         in: path
@@ -2501,15 +2583,92 @@ paths:
         ảnh thuộc Đơn vị
       tags:
       - Tenant Media
+  /v1/media/by-url:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
+        in: header
+        name: X-Tenant-Subdomain
+        type: string
+      - description: Đường dẫn access_url của tệp cần xóa
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/media.DeleteByURLInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa tệp của Đơn vị theo access_url (chuyển vào thùng rác, hoàn dung
+        lượng DB, tự xóa khỏi R2 sau N ngày)
+      tags:
+      - Tenant Media
+  /v1/media/trash:
+    get:
+      parameters:
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
+        in: header
+        name: X-Tenant-Subdomain
+        type: string
+      - description: Trang
+        in: query
+        name: page
+        type: integer
+      - description: Số lượng mỗi trang
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessListResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/media.StoredFile'
+                  type: array
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Danh sách tệp đang nằm trong thùng rác của Đơn vị hiện tại
+      tags:
+      - Tenant Media
   /v1/media/upload:
     post:
       consumes:
       - multipart/form-data
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: School ID ngữ cảnh hiện tại
         in: header
@@ -2574,10 +2733,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: Thông tin menu riêng
         in: body
@@ -2613,10 +2771,9 @@ paths:
   /v1/menus/custom-items/{id}:
     delete:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: Custom Menu Config ID
         in: path
@@ -2648,10 +2805,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: Danh sách cấu hình menu
         in: body
@@ -2682,10 +2838,9 @@ paths:
   /v1/menus/manage:
     get:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       produces:
       - application/json
@@ -2717,10 +2872,9 @@ paths:
   /v1/menus/routes:
     get:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       produces:
       - application/json
@@ -2749,10 +2903,9 @@ paths:
   /v1/organization:
     get:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       produces:
       - application/json
@@ -2779,10 +2932,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: Thông tin cập nhật
         in: body
@@ -4334,6 +4486,9 @@ paths:
       - Platform Media
   /v1/platform/organizations/{org_id}/media/{file_id}:
     delete:
+      deprecated: true
+      description: Hạn chế sử dụng — ưu tiên dùng DELETE /v1/platform/organizations/{org_id}/media/by-url
+        với access_url.
       parameters:
       - description: Organization ID
         in: path
@@ -4362,7 +4517,86 @@ paths:
             $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Xóa ảnh khỏi S3/R2 và hoàn lại dung lượng vào DB của Tổ chức
+      summary: '[Hạn chế sử dụng] Chuyển tệp vào thùng rác theo file_id'
+      tags:
+      - Platform Media
+  /v1/platform/organizations/{org_id}/media/{file_id}/permanent:
+    delete:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      - description: File ID
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa vĩnh viễn tệp trong thùng rác khỏi R2/S3 ngay lập tức
+      tags:
+      - Platform Media
+  /v1/platform/organizations/{org_id}/media/{file_id}/restore:
+    post:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      - description: File ID
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/media.StoredFile'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Khôi phục tệp từ thùng rác (trước khi bị dọn khỏi R2)
       tags:
       - Platform Media
   /v1/platform/organizations/{org_id}/media/{file_id}/url:
@@ -4401,6 +4635,83 @@ paths:
       security:
       - BearerAuth: []
       summary: Lấy đường dẫn truy cập (Public hoặc Presigned URL) của tệp ảnh
+      tags:
+      - Platform Media
+  /v1/platform/organizations/{org_id}/media/by-url:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      - description: Đường dẫn access_url của tệp cần xóa
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/media.DeleteByURLInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa tệp theo access_url (chuyển vào thùng rác, hoàn dung lượng DB,
+        tự xóa khỏi R2 sau N ngày)
+      tags:
+      - Platform Media
+  /v1/platform/organizations/{org_id}/media/trash:
+    get:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: org_id
+        required: true
+        type: string
+      - description: Trang
+        in: query
+        name: page
+        type: integer
+      - description: Số lượng mỗi trang
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessListResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/media.StoredFile'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Danh sách tệp đang nằm trong thùng rác của Tổ chức (chưa bị dọn khỏi
+        R2)
       tags:
       - Platform Media
   /v1/platform/organizations/{org_id}/media/upload:
@@ -5800,10 +6111,9 @@ paths:
   /v1/schools:
     get:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       produces:
       - application/json
@@ -5832,10 +6142,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: Thông tin trường mới
         in: body
@@ -5877,10 +6186,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       - description: School ID
         in: path
@@ -5921,10 +6229,9 @@ paths:
   /v1/storage/usage:
     get:
       parameters:
-      - description: Subdomain của Đơn vị
+      - description: Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)
         in: header
         name: X-Tenant-Subdomain
-        required: true
         type: string
       produces:
       - application/json

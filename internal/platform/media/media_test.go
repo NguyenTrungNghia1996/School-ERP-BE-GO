@@ -106,3 +106,30 @@ func TestDocumentValidation(t *testing.T) {
 		t.Fatalf("expected ErrInvalidFileType for unknown OLE2 ext, got %v", err)
 	}
 }
+
+func TestExtractObjectKeyFromAccessURL(t *testing.T) {
+	want := "orgs/7f284a1b-bec8-41d4-9ed6-f6de5252ff06/logos/2026/11/550e8400-e29b-41d4-a716-446655440000.png"
+	validCases := []string{
+		"https://cdn.nghia196.qzz.io/" + want,
+		"cdn.nghia196.qzz.io/" + want,
+		"https://acc.r2.cloudflarestorage.com/image/" + want + "?X-Amz-Expires=900&X-Amz-Signature=abc",
+		want,
+	}
+	for _, raw := range validCases {
+		got, err := media.ExtractObjectKeyFromAccessURL(raw)
+		if err != nil || got != want {
+			t.Fatalf("ExtractObjectKeyFromAccessURL(%q) = (%q, %v), want %q", raw, got, err, want)
+		}
+	}
+
+	invalidCases := []string{
+		"",
+		"https://cdn.nghia196.qzz.io/other/file.png",
+		"https://cdn.nghia196.qzz.io/orgs/1111/../2222/secret.png",
+	}
+	for _, raw := range invalidCases {
+		if got, err := media.ExtractObjectKeyFromAccessURL(raw); err != media.ErrInvalidAccessURL {
+			t.Fatalf("expected ErrInvalidAccessURL for %q, got (%q, %v)", raw, got, err)
+		}
+	}
+}

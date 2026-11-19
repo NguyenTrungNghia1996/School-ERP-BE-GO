@@ -34,7 +34,7 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 // @Tags Tenant Organization
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Success 200 {object} response.SuccessResponse{data=OrganizationOverviewOutput}
 // @Failure 401 {object} response.ErrorResponse
 // @Router /v1/organization [get]
@@ -59,7 +59,7 @@ func (h *Handler) GetOrganization(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param body body UpdateOrganizationInput true "Thông tin cập nhật"
 // @Success 200 {object} response.SuccessResponse{data=Organization}
 // @Failure 400 {object} response.ErrorResponse
@@ -87,7 +87,7 @@ func (h *Handler) UpdateOrganization(c *fiber.Ctx) error {
 // @Tags Tenant Schools
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Success 200 {object} response.SuccessResponse{data=[]School}
 // @Failure 403 {object} response.ErrorResponse
 // @Router /v1/schools [get]
@@ -109,7 +109,7 @@ func (h *Handler) ListSchools(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param body body CreateSchoolInput true "Thông tin trường mới"
 // @Success 201 {object} response.SuccessResponse{data=School}
 // @Failure 400 {object} response.ErrorResponse
@@ -146,7 +146,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param id path string true "School ID"
 // @Param body body UpdateSchoolInput true "Thông tin cập nhật"
 // @Success 200 {object} response.SuccessResponse{data=School}

@@ -54,15 +54,27 @@ func TenantResolver() fiber.Handler {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		// 1. Đọc & phân giải X-Tenant-Subdomain -> organization_id (Redis 30m -> DB)
+		// 1. Xác định organization_id: tự lấy từ JWT token (claims.OrgID); nếu có X-Tenant-Subdomain thì đối chiếu chéo.
 		subdomain := strings.ToLower(strings.TrimSpace(c.Get("X-Tenant-Subdomain")))
-		if subdomain == "" {
-			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Thiếu header X-Tenant-Subdomain", nil)
-		}
+		var orgID, orgStatus string
 
-		orgID, orgStatus, err := resolveOrganizationBySubdomain(ctx, subdomain)
-		if err != nil || orgID == "" {
-			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy Đơn vị cho subdomain này", nil)
+		if subdomain != "" {
+			orgID, orgStatus, err = resolveOrganizationBySubdomain(ctx, subdomain)
+			if err != nil || orgID == "" {
+				return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy Đơn vị cho subdomain này", nil)
+			}
+			if claims.OrgID != "" && claims.OrgID != orgID {
+				return response.Error(c, fiber.StatusForbidden, response.ErrCodeTenantAccessDenied, "Token không thuộc Đơn vị của subdomain hiện tại", nil)
+			}
+		} else {
+			orgID = strings.TrimSpace(claims.OrgID)
+			if orgID == "" {
+				return response.Error(c, fiber.StatusUnauthorized, response.ErrCodeUnauthorized, "Token không chứa thông tin Đơn vị (org_id)", nil)
+			}
+			subdomain, orgStatus, err = resolveOrganizationByID(ctx, orgID)
+			if err != nil || orgStatus == "" {
+				return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy Đơn vị từ token", nil)
+			}
 		}
 		if orgStatus != "ACTIVE" {
 			return response.Error(c, fiber.StatusForbidden, response.ErrCodeTenantAccessDenied, "Đơn vị hiện không ở trạng thái hoạt động (ACTIVE)", nil)
@@ -186,6 +198,25 @@ func resolveOrganizationBySubdomain(ctx context.Context, subdomain string) (stri
 		_ = config.RedisClient.Set(ctx, cacheKey, string(payload), rediskeys.TTLTenantSubdomain).Err()
 	}
 	return row.ID.String(), row.Status, nil
+}
+
+func resolveOrganizationByID(ctx context.Context, orgID string) (string, string, error) {
+	parsedID, err := uuid.Parse(orgID)
+	if err != nil {
+		return "", "", err
+	}
+	var row struct {
+		Subdomain string `gorm:"column:subdomain"`
+		Status    string `gorm:"column:status"`
+	}
+	if err := config.DB.WithContext(ctx).
+		Table("organizations").
+		Select("subdomain, status").
+		Where("id = ? AND deleted_at IS NULL", parsedID).
+		First(&row).Error; err != nil {
+		return "", "", err
+	}
+	return strings.ToLower(strings.TrimSpace(row.Subdomain)), row.Status, nil
 }
 
 func userBelongsToOrg(ctx context.Context, userID, orgID string) bool {
