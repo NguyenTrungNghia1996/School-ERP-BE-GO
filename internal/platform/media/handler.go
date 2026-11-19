@@ -30,14 +30,14 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 }
 
 // UploadImage godoc
-// @Summary Upload ảnh vào thư mục riêng của Tổ chức trên S3/R2 (kiểm tra hạn mức DB)
+// @Summary Upload ảnh hoặc tài liệu (PDF, Word, Excel) vào thư mục riêng của Tổ chức trên S3/R2
 // @Tags Platform Media
 // @Accept mpfd
 // @Produce json
 // @Security BearerAuth
 // @Param org_id path string true "Organization ID"
-// @Param file formData file true "Tệp ảnh (JPEG, PNG, WEBP, GIF)"
-// @Param folder formData string false "Thư mục con (VD: logos, avatars, students)"
+// @Param file formData file true "Tệp ảnh (JPEG, PNG, WEBP, GIF) hoặc tài liệu (PDF, DOC, DOCX, XLS, XLSX; tối đa 25 MB)"
+// @Param folder formData string false "Thư mục con (VD: logos, avatars, students, documents)"
 // @Param school_id formData string false "School ID (nếu tách theo trường)"
 // @Success 201 {object} response.SuccessResponse{data=StoredFile}
 // @Failure 400 {object} response.ErrorResponse
@@ -95,6 +95,8 @@ func (h *Handler) UploadImage(c *fiber.Ctx) error {
 			return response.Error(c, fiber.StatusServiceUnavailable, response.ErrCodeStorageNotConfigured, "Dịch vụ lưu trữ S3/R2 chưa được cấu hình", nil)
 		case errors.Is(err, ErrOrgNotFound):
 			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy Tổ chức", nil)
+		case errors.Is(err, ErrSchoolNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy Trường học thuộc Tổ chức này", nil)
 		case errors.Is(err, ErrInvalidImageType), errors.Is(err, ErrInvalidFolder):
 			return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, err.Error(), nil)
 		case errors.Is(err, ErrFileTooLarge):

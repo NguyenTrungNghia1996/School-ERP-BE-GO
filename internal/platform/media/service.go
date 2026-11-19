@@ -1,6 +1,8 @@
 package media
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -23,12 +25,16 @@ var (
 	ErrStorageNotConfigured = errors.New("object storage is not configured")
 	ErrOrgNotFound          = errors.New("organization not found")
 	ErrFileNotFound         = errors.New("file not found")
-	ErrInvalidImageType     = errors.New("only JPEG, PNG, WEBP, GIF images are supported")
-	ErrFileTooLarge         = errors.New("image file exceeds maximum allowed size")
+	ErrInvalidImageType     = errors.New("chỉ hỗ trợ ảnh (JPEG, PNG, WEBP, GIF) và tài liệu (PDF, Word DOC/DOCX, Excel XLS/XLSX)")
+	ErrInvalidFileType      = ErrInvalidImageType
+	ErrFileTooLarge         = errors.New("tệp tải lên vượt quá dung lượng tối đa cho phép")
 	ErrInvalidFolder        = errors.New("invalid folder name")
+	ErrSchoolNotFound       = errors.New("school not found in organization")
 	ErrStorageQuotaExceeded = errors.New("organization storage quota exceeded")
 
 	folderRegex = regexp.MustCompile(`^[a-z0-9][a-z0-9/_-]{0,79}$`)
+
+	ole2MagicHeader = []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}
 
 	allowedImageExts = map[string]string{
 		"image/jpeg": ".jpg",
@@ -39,7 +45,7 @@ var (
 )
 
 const (
-	defaultMaxImageBytes   int64 = 10 * 1024 * 1024       // 10 MB
+	defaultMaxFileBytes    int64 = 25 * 1024 * 1024       // 25 MB
 	defaultOrgQuotaBytes   int64 = 1 * 1024 * 1024 * 1024 // 1 GB fallback if package has no quota
 	defaultPresignDuration       = 15 * time.Minute
 )
@@ -65,13 +71,20 @@ func NewService(db *gorm.DB, store storage.ObjectStorage, quotas QuotaProvider, 
 	}
 }
 
+// MaxImageSizeBytes returns the maximum allowed image payload size in bytes.
+func MaxImageSizeBytes() int64 {
+	return maxImageSizeBytes()
+}
+
 func maxImageSizeBytes() int64 {
-	if raw := strings.TrimSpace(os.Getenv("STORAGE_MAX_IMAGE_BYTES")); raw != "" {
-		if v, err := strconv.ParseInt(raw, 10, 64); err == nil && v > 0 {
-			return v
+	for _, envKey := range []string{"STORAGE_MAX_FILE_BYTES", "STORAGE_MAX_IMAGE_BYTES"} {
+		if raw := strings.TrimSpace(os.Getenv(envKey)); raw != "" {
+			if v, err := strconv.ParseInt(raw, 10, 64); err == nil && v > 0 {
+				return v
+			}
 		}
 	}
-	return defaultMaxImageBytes
+	return defaultMaxFileBytes
 }
 
 func fallbackQuotaBytes() int64 {
@@ -105,26 +118,84 @@ func BuildOrgObjectKey(orgID uuid.UUID, schoolID *uuid.UUID, folder string, file
 		orgID.String(), folder, now.Year(), int(now.Month()), fileID.String(), ext)
 }
 
-// ValidateImagePayload checks size and detects MIME type from actual file bytes.
+// ValidateImagePayload checks size and detects MIME type from actual file bytes (kept for compatibility).
 func ValidateImagePayload(data []byte) (string, string, error) {
+	return ValidateFilePayload(data, "")
+}
+
+// ValidateFilePayload checks size and detects MIME type from actual file bytes.
+// Supports images (JPEG, PNG, WEBP, GIF) and documents (PDF, Word DOC/DOCX, Excel XLS/XLSX).
+func ValidateFilePayload(data []byte, originalName string) (string, string, error) {
 	if len(data) == 0 {
-		return "", "", ErrInvalidImageType
+		return "", "", ErrInvalidFileType
 	}
 	if int64(len(data)) > maxImageSizeBytes() {
 		return "", "", ErrFileTooLarge
 	}
+
 	mimeType := http.DetectContentType(data)
-	ext, ok := allowedImageExts[mimeType]
-	if !ok {
-		return "", "", ErrInvalidImageType
+	if ext, ok := allowedImageExts[mimeType]; ok {
+		return mimeType, ext, nil
 	}
-	return mimeType, ext, nil
+
+	if mimeType == "application/pdf" || bytes.HasPrefix(data, []byte("%PDF-")) {
+		return "application/pdf", ".pdf", nil
+	}
+
+	// OOXML (DOCX / XLSX) are ZIP archives containing [Content_Types].xml and word/ or xl/ XML entries
+	if mimeType == "application/zip" || bytes.HasPrefix(data, []byte{'P', 'K', 0x03, 0x04}) {
+		if ooxmlMime, ooxmlExt, ok := detectOOXML(data); ok {
+			return ooxmlMime, ooxmlExt, nil
+		}
+		return "", "", ErrInvalidFileType
+	}
+
+	// Legacy Microsoft Office OLE2 binary format (.doc / .xls)
+	if bytes.HasPrefix(data, ole2MagicHeader) {
+		switch strings.ToLower(filepath.Ext(strings.TrimSpace(originalName))) {
+		case ".doc":
+			return "application/msword", ".doc", nil
+		case ".xls":
+			return "application/vnd.ms-excel", ".xls", nil
+		}
+	}
+
+	return "", "", ErrInvalidFileType
+}
+
+func detectOOXML(data []byte) (string, string, bool) {
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return "", "", false
+	}
+	var hasContentTypes, hasWord, hasExcel bool
+	for _, f := range zr.File {
+		switch f.Name {
+		case "[Content_Types].xml":
+			hasContentTypes = true
+		case "word/document.xml":
+			hasWord = true
+		case "xl/workbook.xml":
+			hasExcel = true
+		}
+	}
+	if !hasContentTypes {
+		return "", "", false
+	}
+	if hasWord {
+		return "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx", true
+	}
+	if hasExcel {
+		return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx", true
+	}
+	return "", "", false
 }
 
 type UploadImageInput struct {
 	OrganizationID uuid.UUID
 	SchoolID       *uuid.UUID
 	UploadedBy     uuid.UUID
+	ActorType      string // "PLATFORM" (default) | "TENANT"
 	Folder         string
 	OriginalName   string
 	Data           []byte
@@ -159,7 +230,7 @@ func (s *Service) UploadImage(ctx context.Context, input UploadImageInput) (*Sto
 		return nil, ErrStorageNotConfigured
 	}
 
-	mimeType, ext, err := ValidateImagePayload(input.Data)
+	mimeType, ext, err := ValidateFilePayload(input.Data, input.OriginalName)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +251,7 @@ func (s *Service) UploadImage(ctx context.Context, input UploadImageInput) (*Sto
 			return nil, err
 		}
 		if schoolCount == 0 {
-			return nil, ErrInvalidFolder
+			return nil, ErrSchoolNotFound
 		}
 	}
 
@@ -262,8 +333,12 @@ func (s *Service) UploadImage(ctx context.Context, input UploadImageInput) (*Sto
 		}
 
 		if s.auditor != nil {
+			actorType := strings.ToUpper(strings.TrimSpace(input.ActorType))
+			if actorType == "" {
+				actorType = "PLATFORM"
+			}
 			return s.auditor.Log(tx, audit.AuditEntry{
-				ActorType:      "PLATFORM",
+				ActorType:      actorType,
 				ActorID:        &input.UploadedBy,
 				OrganizationID: &input.OrganizationID,
 				Action:         "MEDIA_IMAGE_UPLOADED",
@@ -409,8 +484,16 @@ func (s *Service) GetFileURL(ctx context.Context, orgID, fileID uuid.UUID) (*Med
 }
 
 func (s *Service) DeleteFile(ctx context.Context, orgID, fileID, actorID uuid.UUID, ip, ua string) error {
+	return s.DeleteFileForActor(ctx, orgID, fileID, actorID, "PLATFORM", ip, ua)
+}
+
+func (s *Service) DeleteFileForActor(ctx context.Context, orgID, fileID, actorID uuid.UUID, actorType, ip, ua string) error {
 	if s.store == nil || !s.store.IsConfigured() {
 		return ErrStorageNotConfigured
+	}
+	actorType = strings.ToUpper(strings.TrimSpace(actorType))
+	if actorType == "" {
+		actorType = "PLATFORM"
 	}
 
 	var file StoredFile
@@ -443,7 +526,7 @@ func (s *Service) DeleteFile(ctx context.Context, orgID, fileID, actorID uuid.UU
 
 		if s.auditor != nil {
 			return s.auditor.Log(tx, audit.AuditEntry{
-				ActorType:      "PLATFORM",
+				ActorType:      actorType,
 				ActorID:        &actorID,
 				OrganizationID: &orgID,
 				Action:         "MEDIA_IMAGE_DELETED",
