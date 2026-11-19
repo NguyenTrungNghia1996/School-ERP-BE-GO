@@ -132,4 +132,16 @@ func TestExtractObjectKeyFromAccessURL(t *testing.T) {
 			t.Fatalf("expected ErrInvalidAccessURL for %q, got (%q, %v)", raw, got, err)
 		}
 	}
+
+	// Platform-level object key & URL extraction
+	wantPlat := "platform/avatars/2026/11/550e8400-e29b-41d4-a716-446655440000.png"
+	if k := media.BuildPlatformObjectKey("avatars", uuid.MustParse("550e8400-e29b-41d4-a716-446655440000"), ".png", time.Date(2026, 11, 19, 0, 0, 0, 0, time.UTC)); k != wantPlat {
+		t.Fatalf("unexpected platform key: %s", k)
+	}
+	if got, err := media.ExtractPlatformObjectKeyFromAccessURL("https://cdn.nghia196.qzz.io/" + wantPlat); err != nil || got != wantPlat {
+		t.Fatalf("ExtractPlatformObjectKeyFromAccessURL failed: (%q, %v)", got, err)
+	}
+	if _, err := media.ExtractPlatformObjectKeyFromAccessURL("https://cdn.nghia196.qzz.io/" + want); err != media.ErrInvalidAccessURL {
+		t.Fatalf("expected ErrInvalidAccessURL when passing org URL to platform extractor, got %v", err)
+	}
 }

@@ -165,7 +165,12 @@ func RegisterRoutes(api fiber.Router) {
 	// Nhóm 6: Audit Logs
 	protected.Get("/audit-logs", middleware.RequirePlatformPermission("platform:audit:read"), auditHandler.List)
 
-	// Nhóm 7: Lưu trữ ảnh/tài liệu S3 / Cloudflare R2 & Dung lượng theo từng đơn vị
+	// Nhóm 7: Lưu trữ ảnh/tài liệu S3 / Cloudflare R2 (cấp Platform & theo từng đơn vị)
+	protected.Get("/media", middleware.RequirePlatformPermission("platform:media:read"), mediaHandler.ListPlatformFiles)
+	protected.Post("/media/upload", middleware.RequirePlatformPermission("platform:media:manage"), mediaHandler.UploadPlatformFile)
+	protected.Delete("/media/by-url", middleware.RequirePlatformPermission("platform:media:manage"), mediaHandler.DeletePlatformFileByURL)
+	protected.Delete("/media/:file_id", middleware.RequirePlatformPermission("platform:media:manage"), mediaHandler.DeletePlatformFile)
+
 	protected.Get("/organizations/:org_id/storage/usage", middleware.RequirePlatformPermission("platform:media:read"), mediaHandler.GetUsage)
 	protected.Get("/organizations/:org_id/media", middleware.RequirePlatformPermission("platform:media:read"), mediaHandler.ListFiles)
 	protected.Get("/organizations/:org_id/media/trash", middleware.RequirePlatformPermission("platform:media:read"), mediaHandler.ListTrash)
