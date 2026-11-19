@@ -82,7 +82,7 @@ func (r *Repository) GetUserIDsByRoleID(tx *gorm.DB, roleID uuid.UUID) ([]string
 func (r *Repository) GetUsersByRoleID(ctx context.Context, roleID uuid.UUID) ([]RoleUserSummary, error) {
 	var users []RoleUserSummary
 	err := r.db.WithContext(ctx).Raw(`
-		SELECT u.id, u.email, u.full_name, u.status, u.created_at
+		SELECT u.id, u.email, u.full_name, u.avatar_url, u.status, u.created_at
 		FROM platform_users u
 		JOIN platform_user_roles ur ON ur.platform_user_id = u.id
 		WHERE ur.platform_role_id = ? AND u.deleted_at IS NULL

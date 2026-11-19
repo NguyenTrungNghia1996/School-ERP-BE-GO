@@ -152,6 +152,39 @@ func (h *Handler) Me(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, profile)
 }
 
+// UpdateMe godoc
+// @Summary Cập nhật hồ sơ cá nhân Platform Admin (full_name, phone, avatar_url)
+// @Tags Platform Auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body UpdateMeInput true "Thông tin hồ sơ cập nhật"
+// @Success 200 {object} response.SuccessResponse{data=iam.PlatformUser}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /v1/platform/me [patch]
+func (h *Handler) UpdateMe(c *fiber.Ctx) error {
+	userID, _ := c.Locals("platform_user_id").(string)
+	if userID == "" {
+		return response.Error(c, fiber.StatusUnauthorized, response.ErrCodeUnauthorized, "Chưa xác thực", nil)
+	}
+
+	var body UpdateMeInput
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu cập nhật không hợp lệ", err.Error())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	user, err := h.service.UpdateMe(ctx, userID, body)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể cập nhật hồ sơ cá nhân", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, user)
+}
+
 // SetupMFA godoc
 // @Summary Khởi tạo khóa MFA (TOTP)
 // @Tags Platform Auth

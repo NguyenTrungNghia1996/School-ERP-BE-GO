@@ -211,6 +211,7 @@ type CreateOrganizationInput struct {
 	Code         string  `json:"code"`
 	Name         string  `json:"name"`
 	Subdomain    string  `json:"subdomain"`
+	LogoURL      *string `json:"logo_url"`
 	ContactEmail *string `json:"contact_email"`
 	ContactPhone *string `json:"contact_phone"`
 	TaxCode      *string `json:"tax_code"`
@@ -222,6 +223,7 @@ type CreateOrganizationInput struct {
 		Address *string `json:"address"`
 		Phone   *string `json:"phone"`
 		Email   *string `json:"email"`
+		LogoURL *string `json:"logo_url"`
 	} `json:"school"`
 	Admin struct {
 		Email    string  `json:"email"`
@@ -232,6 +234,15 @@ type CreateOrganizationInput struct {
 	ActorID   uuid.UUID `json:"-"`
 	IPAddress string    `json:"-"`
 	UserAgent string    `json:"-"`
+}
+
+type UpdateOrganizationInput struct {
+	Name         *string `json:"name" example:"Hệ thống Trường THPT Chu Văn An"`
+	LogoURL      *string `json:"logo_url" example:"https://cdn.nghia196.qzz.io/orgs/.../logo.png"`
+	ContactEmail *string `json:"contact_email" example:"contact@chuvanan.edu.vn"`
+	ContactPhone *string `json:"contact_phone" example:"02438889999"`
+	TaxCode      *string `json:"tax_code" example:"0101234567"`
+	Address      *string `json:"address" example:"Số 10 Thụy Khuê, Tây Hồ, Hà Nội"`
 }
 
 func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizationInput) (map[string]any, error) {
@@ -286,12 +297,20 @@ func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizati
 			return err
 		}
 
+		var orgLogoURL *string
+		if input.LogoURL != nil {
+			if trimmed := strings.TrimSpace(*input.LogoURL); trimmed != "" {
+				orgLogoURL = &trimmed
+			}
+		}
+
 		now := time.Now()
 		org = Organization{
 			ID:           uuid.New(),
 			Code:         orgCode,
 			Name:         strings.TrimSpace(input.Name),
 			Subdomain:    subdomain,
+			LogoURL:      orgLogoURL,
 			ContactEmail: input.ContactEmail,
 			ContactPhone: input.ContactPhone,
 			TaxCode:      input.TaxCode,
@@ -319,6 +338,7 @@ func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizati
 			Address:        input.School.Address,
 			Phone:          input.School.Phone,
 			Email:          input.School.Email,
+			LogoURL:        input.School.LogoURL,
 			IsMain:         true,
 			Status:         "ACTIVE",
 		}
@@ -431,6 +451,76 @@ func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizati
 		}
 	}
 	return res, nil
+}
+
+func (s *Service) UpdateOrganization(ctx context.Context, orgID uuid.UUID, input UpdateOrganizationInput, actorID uuid.UUID, ip, ua string) (*Organization, error) {
+	var org Organization
+	if err := s.db.WithContext(ctx).First(&org, "id = ?", orgID).Error; err != nil {
+		return nil, ErrOrgNotFound
+	}
+
+	updates := map[string]any{"updated_at": time.Now()}
+	if input.Name != nil {
+		if trimmed := strings.TrimSpace(*input.Name); trimmed != "" {
+			updates["name"] = trimmed
+		}
+	}
+	if input.LogoURL != nil {
+		if trimmed := strings.TrimSpace(*input.LogoURL); trimmed != "" {
+			updates["logo_url"] = trimmed
+		} else {
+			updates["logo_url"] = nil
+		}
+	}
+	if input.ContactEmail != nil {
+		updates["contact_email"] = input.ContactEmail
+	}
+	if input.ContactPhone != nil {
+		updates["contact_phone"] = input.ContactPhone
+	}
+	if input.TaxCode != nil {
+		updates["tax_code"] = input.TaxCode
+	}
+	if input.Address != nil {
+		updates["address"] = input.Address
+	}
+
+	before := map[string]any{
+		"name":          org.Name,
+		"logo_url":      org.LogoURL,
+		"contact_email": org.ContactEmail,
+		"contact_phone": org.ContactPhone,
+		"tax_code":      org.TaxCode,
+		"address":       org.Address,
+	}
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&org).Updates(updates).Error; err != nil {
+			return err
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:      "PLATFORM",
+			ActorID:        &actorID,
+			OrganizationID: &org.ID,
+			Action:         "ORG_UPDATED",
+			ResourceType:   "ORGANIZATION",
+			ResourceID:     &org.ID,
+			BeforeData:     before,
+			AfterData:      updates,
+			IPAddress:      ip,
+			UserAgent:      ua,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if s.rdb != nil {
+		_ = s.rdb.Del(ctx, rediskeys.TenantSubdomainKey(org.Subdomain)).Err()
+	}
+
+	_ = s.db.WithContext(ctx).First(&org, "id = ?", orgID).Error
+	return &org, nil
 }
 
 func (s *Service) ApproveOrganization(ctx context.Context, orgID, actorID uuid.UUID, ip, ua string) (*Organization, error) {
@@ -999,6 +1089,7 @@ func (s *Service) ResolveTenantBySubdomain(ctx context.Context, subdomain string
 			"code":            org.Code,
 			"name":            org.Name,
 			"subdomain":       org.Subdomain,
+			"logo_url":        org.LogoURL,
 			"dns_status":      org.DNSStatus,
 		}
 		if s.rdb != nil {

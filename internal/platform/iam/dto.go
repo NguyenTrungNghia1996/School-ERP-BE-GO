@@ -19,6 +19,7 @@ type CreateUserInput struct {
 	Password           string      `json:"password" example:"TempPassword@2026"`
 	FullName           string      `json:"full_name" example:"Trần Minh Anh"`
 	Phone              *string     `json:"phone" example:"0912345678"`
+	AvatarURL          *string     `json:"avatar_url" example:"https://cdn.nghia196.qzz.io/platform/avatars/admin.png"`
 	MustChangePassword bool        `json:"must_change_password" example:"true"`
 	RoleIDs            []uuid.UUID `json:"role_ids"`
 	ActorID            uuid.UUID   `json:"-"`
@@ -29,6 +30,7 @@ type CreateUserInput struct {
 type UpdateUserInput struct {
 	FullName  *string   `json:"full_name" example:"Trần Minh Anh"`
 	Phone     *string   `json:"phone" example:"0912345678"`
+	AvatarURL *string   `json:"avatar_url" example:"https://cdn.nghia196.qzz.io/platform/avatars/admin.png"`
 	Status    *string   `json:"status" example:"ACTIVE"`
 	Reason    string    `json:"reason" example:"Cập nhật thông tin nhân sự"`
 	ActorID   uuid.UUID `json:"-"`
@@ -97,6 +99,7 @@ type RoleUserSummary struct {
 	ID        uuid.UUID `json:"id"`
 	Email     string    `json:"email"`
 	FullName  string    `json:"full_name"`
+	AvatarURL *string   `json:"avatar_url"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 }

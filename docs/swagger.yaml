@@ -176,6 +176,18 @@ definitions:
       refresh_token:
         type: string
     type: object
+  auth.UpdateMeInput:
+    properties:
+      avatar_url:
+        example: https://cdn.nghia196.qzz.io/platform/avatars/admin.png
+        type: string
+      full_name:
+        example: Nguyễn Văn A
+        type: string
+      phone:
+        example: "0912345678"
+        type: string
+    type: object
   billing.ActivePackageSummary:
     properties:
       expires_at:
@@ -731,6 +743,9 @@ definitions:
     type: object
   iam.CreateUserInput:
     properties:
+      avatar_url:
+        example: https://cdn.nghia196.qzz.io/platform/avatars/admin.png
+        type: string
       email:
         example: cskh.hanoi@school-erp.vn
         type: string
@@ -913,6 +928,8 @@ definitions:
     type: object
   iam.RoleUserSummary:
     properties:
+      avatar_url:
+        type: string
       created_at:
         type: string
       email:
@@ -1063,6 +1080,9 @@ definitions:
     type: object
   iam.UpdateUserInput:
     properties:
+      avatar_url:
+        example: https://cdn.nghia196.qzz.io/platform/avatars/admin.png
+        type: string
       full_name:
         example: Trần Minh Anh
         type: string
@@ -1635,6 +1655,8 @@ definitions:
         type: string
       contact_phone:
         type: string
+      logo_url:
+        type: string
       name:
         type: string
       school:
@@ -1646,6 +1668,8 @@ definitions:
           email:
             type: string
           level:
+            type: string
+          logo_url:
             type: string
           name:
             type: string
@@ -1682,6 +1706,8 @@ definitions:
       dns_synced_at:
         type: string
       id:
+        type: string
+      logo_url:
         type: string
       name:
         type: string
@@ -1747,6 +1773,8 @@ definitions:
         type: string
       id:
         type: string
+      logo_url:
+        type: string
       name:
         type: string
       primary_expires_at:
@@ -1805,6 +1833,27 @@ definitions:
       valid:
         example: true
         type: boolean
+    type: object
+  tenant_mgmt.UpdateOrganizationInput:
+    properties:
+      address:
+        example: Số 10 Thụy Khuê, Tây Hồ, Hà Nội
+        type: string
+      contact_email:
+        example: contact@chuvanan.edu.vn
+        type: string
+      contact_phone:
+        example: "02438889999"
+        type: string
+      logo_url:
+        example: https://cdn.nghia196.qzz.io/orgs/.../logo.png
+        type: string
+      name:
+        example: Hệ thống Trường THPT Chu Văn An
+        type: string
+      tax_code:
+        example: "0101234567"
+        type: string
     type: object
 info:
   contact: {}
@@ -3943,6 +3992,41 @@ paths:
       summary: Thông tin tài khoản Platform hiện tại
       tags:
       - Platform Auth
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin hồ sơ cập nhật
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.UpdateMeInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/iam.PlatformUser'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật hồ sơ cá nhân Platform Admin (full_name, phone, avatar_url)
+      tags:
+      - Platform Auth
   /v1/platform/me/change-password:
     post:
       consumes:
@@ -4251,6 +4335,47 @@ paths:
       security:
       - BearerAuth: []
       summary: Chi tiết Tổ chức
+      tags:
+      - Platform Organizations
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin cập nhật
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tenant_mgmt.UpdateOrganizationInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/tenant_mgmt.Organization'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật thông tin Tổ chức (tên, logo_url, liên hệ, mã số thuế, địa
+        chỉ)
       tags:
       - Platform Organizations
   /v1/platform/organizations/{id}/approve:
