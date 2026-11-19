@@ -18,6 +18,10 @@ var (
 	ErrFeatureNotFound           = errors.New("feature not found")
 	ErrPermissionNotFound        = errors.New("permission not found")
 	ErrRouteNotFound             = errors.New("tenant route not found")
+	ErrMenuNotFound              = errors.New("tenant base menu not found")
+	ErrCoreFeatureProtected      = errors.New("core feature cannot be deleted")
+	ErrResourceInUse             = errors.New("catalog resource is currently in use")
+	ErrMenuHasChildren           = errors.New("menu node still has child items")
 	ErrInvalidFeatureCodeFormat  = errors.New("feature code must match ^[A-Z0-9_]+$")
 	ErrInvalidPermCodeFormat     = errors.New("permission code must match ^[a-z0-9_]+:[a-z0-9_]+$")
 	ErrFeatureInUseCannotModify  = errors.New("feature is already in use and cannot change code")
@@ -594,6 +598,380 @@ func (s *Service) ReorderMenus(ctx context.Context, items []ReorderMenuItem, act
 			Action:       "CATALOG_TENANT_MENUS_REORDERED",
 			ResourceType: "TENANT_BASE_MENU",
 			AfterData:    map[string]any{"reordered_count": len(items)},
+			IPAddress:    ip,
+			UserAgent:    ua,
+		})
+	})
+}
+
+func (s *Service) DeleteFeature(ctx context.Context, featureID, actorID uuid.UUID, ip, ua string) error {
+	var f Feature
+	if err := s.db.WithContext(ctx).First(&f, "id = ?", featureID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrFeatureNotFound
+		}
+		return err
+	}
+	if f.IsCore {
+		return ErrCoreFeatureProtected
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var pkgCount, permCount, routeCount, menuCount int64
+		tx.Table("service_package_features").Where("feature_id = ?", featureID).Count(&pkgCount)
+		tx.Model(&TenantPermission{}).Where("feature_id = ?", featureID).Count(&permCount)
+		tx.Model(&TenantRoute{}).Where("feature_id = ?", featureID).Count(&routeCount)
+		tx.Model(&TenantBaseMenu{}).Where("feature_id = ?", featureID).Count(&menuCount)
+		if pkgCount > 0 || permCount > 0 || routeCount > 0 || menuCount > 0 {
+			return ErrResourceInUse
+		}
+		if err := tx.Delete(&f).Error; err != nil {
+			return err
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &actorID,
+			Action:       "CATALOG_FEATURE_DELETED",
+			ResourceType: "FEATURE",
+			ResourceID:   &f.ID,
+			BeforeData:   f,
+			IPAddress:    ip,
+			UserAgent:    ua,
+		})
+	})
+}
+
+func (s *Service) DeletePermission(ctx context.Context, permID, actorID uuid.UUID, ip, ua string) error {
+	var p TenantPermission
+	if err := s.db.WithContext(ctx).First(&p, "id = ?", permID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrPermissionNotFound
+		}
+		return err
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var roleCount int64
+		tx.Table("role_permissions").Where("permission_id = ?", permID).Count(&roleCount)
+		if roleCount > 0 {
+			return ErrResourceInUse
+		}
+		if err := tx.Delete(&p).Error; err != nil {
+			return err
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &actorID,
+			Action:       "CATALOG_PERMISSION_DELETED",
+			ResourceType: "PERMISSION",
+			ResourceID:   &p.ID,
+			BeforeData:   p,
+			IPAddress:    ip,
+			UserAgent:    ua,
+		})
+	})
+}
+
+type CreateRouteInput struct {
+	RouteKey  string     `json:"route_key" example:"finance.invoices"`
+	Path      string     `json:"path" example:"/finance/invoices"`
+	FeatureID *uuid.UUID `json:"feature_id"`
+	Name      string     `json:"name" example:"Quản lý Hóa đơn"`
+	IsActive  *bool      `json:"is_active"`
+	ActorID   uuid.UUID  `json:"-"`
+	IPAddress string     `json:"-"`
+	UserAgent string     `json:"-"`
+}
+
+type UpdateRouteInput struct {
+	RouteKey  *string    `json:"route_key"`
+	Path      *string    `json:"path"`
+	FeatureID *uuid.UUID `json:"feature_id"`
+	Name      *string    `json:"name"`
+	IsActive  *bool      `json:"is_active"`
+	ActorID   uuid.UUID  `json:"-"`
+	IPAddress string     `json:"-"`
+	UserAgent string     `json:"-"`
+}
+
+func (s *Service) CreateRoute(ctx context.Context, input CreateRouteInput) (*TenantRoute, error) {
+	routeKey := strings.TrimSpace(input.RouteKey)
+	path := strings.TrimSpace(input.Path)
+	name := strings.TrimSpace(input.Name)
+
+	var dup int64
+	s.db.WithContext(ctx).Model(&TenantRoute{}).Where("route_key = ? OR path = ?", routeKey, path).Count(&dup)
+	if dup > 0 {
+		return nil, ErrCodeAlreadyExists
+	}
+
+	isActive := true
+	if input.IsActive != nil {
+		isActive = *input.IsActive
+	}
+
+	r := &TenantRoute{
+		ID:        uuid.New(),
+		RouteKey:  routeKey,
+		Path:      path,
+		FeatureID: input.FeatureID,
+		Name:      name,
+		IsActive:  isActive,
+	}
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(r).Error; err != nil {
+			return err
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &input.ActorID,
+			Action:       "CATALOG_ROUTE_CREATED",
+			ResourceType: "TENANT_ROUTE",
+			ResourceID:   &r.ID,
+			AfterData:    r,
+			IPAddress:    input.IPAddress,
+			UserAgent:    input.UserAgent,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (s *Service) UpdateRoute(ctx context.Context, routeID uuid.UUID, input UpdateRouteInput) (*TenantRoute, error) {
+	var r TenantRoute
+	if err := s.db.WithContext(ctx).First(&r, "id = ?", routeID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrRouteNotFound
+		}
+		return nil, err
+	}
+
+	updates := map[string]any{}
+	if input.RouteKey != nil && strings.TrimSpace(*input.RouteKey) != "" {
+		rk := strings.TrimSpace(*input.RouteKey)
+		var dup int64
+		s.db.WithContext(ctx).Model(&TenantRoute{}).Where("route_key = ? AND id <> ?", rk, routeID).Count(&dup)
+		if dup > 0 {
+			return nil, ErrCodeAlreadyExists
+		}
+		updates["route_key"] = rk
+	}
+	if input.Path != nil && strings.TrimSpace(*input.Path) != "" {
+		p := strings.TrimSpace(*input.Path)
+		var dup int64
+		s.db.WithContext(ctx).Model(&TenantRoute{}).Where("path = ? AND id <> ?", p, routeID).Count(&dup)
+		if dup > 0 {
+			return nil, ErrCodeAlreadyExists
+		}
+		updates["path"] = p
+	}
+	if input.FeatureID != nil {
+		updates["feature_id"] = input.FeatureID
+	}
+	if input.Name != nil && strings.TrimSpace(*input.Name) != "" {
+		updates["name"] = strings.TrimSpace(*input.Name)
+	}
+	if input.IsActive != nil {
+		updates["is_active"] = *input.IsActive
+	}
+
+	before := r
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if len(updates) > 0 {
+			if err := tx.Model(&r).Updates(updates).Error; err != nil {
+				return err
+			}
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &input.ActorID,
+			Action:       "CATALOG_ROUTE_UPDATED",
+			ResourceType: "TENANT_ROUTE",
+			ResourceID:   &r.ID,
+			BeforeData:   before,
+			AfterData:    updates,
+			IPAddress:    input.IPAddress,
+			UserAgent:    input.UserAgent,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	_ = s.db.WithContext(ctx).First(&r, "id = ?", routeID).Error
+	return &r, nil
+}
+
+func (s *Service) DeleteRoute(ctx context.Context, routeID, actorID uuid.UUID, ip, ua string) error {
+	var r TenantRoute
+	if err := s.db.WithContext(ctx).First(&r, "id = ?", routeID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrRouteNotFound
+		}
+		return err
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var menuCount, cfgCount int64
+		tx.Model(&TenantBaseMenu{}).Where("route_id = ?", routeID).Count(&menuCount)
+		tx.Table("organization_menu_configs").Where("custom_route_id = ?", routeID).Count(&cfgCount)
+		if menuCount > 0 || cfgCount > 0 {
+			return ErrResourceInUse
+		}
+		if err := tx.Delete(&r).Error; err != nil {
+			return err
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &actorID,
+			Action:       "CATALOG_ROUTE_DELETED",
+			ResourceType: "TENANT_ROUTE",
+			ResourceID:   &r.ID,
+			BeforeData:   r,
+			IPAddress:    ip,
+			UserAgent:    ua,
+		})
+	})
+}
+
+type UpdateMenuInput struct {
+	ParentID            *uuid.UUID `json:"parent_id"`
+	Label               *string    `json:"label"`
+	Icon                *string    `json:"icon"`
+	MenuType            *string    `json:"menu_type"`
+	RouteID             *uuid.UUID `json:"route_id"`
+	FeatureID           *uuid.UUID `json:"feature_id"`
+	RequiredPermissions []string   `json:"required_permissions"`
+	PermissionMatchMode *string    `json:"permission_match_mode"`
+	TargetPortals       []string   `json:"target_portals"`
+	IsMandatory         *bool      `json:"is_mandatory"`
+	SortOrder           *int       `json:"sort_order"`
+	IsActive            *bool      `json:"is_active"`
+	ActorID             uuid.UUID  `json:"-"`
+	IPAddress           string     `json:"-"`
+	UserAgent           string     `json:"-"`
+}
+
+func (s *Service) UpdateMenu(ctx context.Context, menuID uuid.UUID, input UpdateMenuInput) (*TenantBaseMenu, error) {
+	var node TenantBaseMenu
+	if err := s.db.WithContext(ctx).First(&node, "id = ?", menuID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrMenuNotFound
+		}
+		return nil, err
+	}
+
+	updates := map[string]any{"updated_at": time.Now()}
+	if input.ParentID != nil {
+		if *input.ParentID == uuid.Nil {
+			updates["parent_id"] = nil
+		} else {
+			updates["parent_id"] = input.ParentID
+		}
+	}
+	if input.Label != nil && strings.TrimSpace(*input.Label) != "" {
+		updates["label"] = strings.TrimSpace(*input.Label)
+	}
+	if input.Icon != nil {
+		updates["icon"] = input.Icon
+	}
+	if input.MenuType != nil && strings.TrimSpace(*input.MenuType) != "" {
+		updates["menu_type"] = strings.ToUpper(strings.TrimSpace(*input.MenuType))
+	}
+	if input.RouteID != nil {
+		if *input.RouteID == uuid.Nil {
+			updates["route_id"] = nil
+		} else {
+			var routeCount int64
+			s.db.WithContext(ctx).Model(&TenantRoute{}).Where("id = ?", *input.RouteID).Count(&routeCount)
+			if routeCount == 0 {
+				return nil, ErrRouteNotFound
+			}
+			updates["route_id"] = input.RouteID
+		}
+	}
+	if input.FeatureID != nil {
+		if *input.FeatureID == uuid.Nil {
+			updates["feature_id"] = nil
+		} else {
+			updates["feature_id"] = input.FeatureID
+		}
+	}
+	if input.RequiredPermissions != nil {
+		if b, err := json.Marshal(input.RequiredPermissions); err == nil {
+			updates["required_permissions"] = json.RawMessage(b)
+		}
+	}
+	if input.PermissionMatchMode != nil && strings.TrimSpace(*input.PermissionMatchMode) != "" {
+		updates["permission_match_mode"] = strings.ToUpper(strings.TrimSpace(*input.PermissionMatchMode))
+	}
+	if input.TargetPortals != nil {
+		if b, err := json.Marshal(input.TargetPortals); err == nil {
+			updates["target_portals"] = json.RawMessage(b)
+		}
+	}
+	if input.IsMandatory != nil {
+		updates["is_mandatory"] = *input.IsMandatory
+	}
+	if input.SortOrder != nil {
+		updates["sort_order"] = *input.SortOrder
+	}
+	if input.IsActive != nil {
+		updates["is_active"] = *input.IsActive
+	}
+
+	before := node
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&node).Updates(updates).Error; err != nil {
+			return err
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &input.ActorID,
+			Action:       "CATALOG_TENANT_MENU_UPDATED",
+			ResourceType: "TENANT_BASE_MENU",
+			ResourceID:   &node.ID,
+			BeforeData:   before,
+			AfterData:    updates,
+			IPAddress:    input.IPAddress,
+			UserAgent:    input.UserAgent,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	_ = s.db.WithContext(ctx).Preload("Route").Preload("Feature").First(&node, "id = ?", menuID).Error
+	return &node, nil
+}
+
+func (s *Service) DeleteMenu(ctx context.Context, menuID, actorID uuid.UUID, ip, ua string) error {
+	var node TenantBaseMenu
+	if err := s.db.WithContext(ctx).First(&node, "id = ?", menuID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrMenuNotFound
+		}
+		return err
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var childCount int64
+		tx.Model(&TenantBaseMenu{}).Where("parent_id = ?", menuID).Count(&childCount)
+		if childCount > 0 {
+			return ErrMenuHasChildren
+		}
+		if err := tx.Delete(&node).Error; err != nil {
+			return err
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &actorID,
+			Action:       "CATALOG_TENANT_MENU_DELETED",
+			ResourceType: "TENANT_BASE_MENU",
+			ResourceID:   &node.ID,
+			BeforeData:   node,
 			IPAddress:    ip,
 			UserAgent:    ua,
 		})

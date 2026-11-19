@@ -441,6 +441,18 @@ definitions:
       reason:
         type: string
     type: object
+  billing.UpdatePackageInput:
+    properties:
+      description:
+        type: string
+      is_active:
+        type: boolean
+      is_public:
+        type: boolean
+      name:
+        example: Gói Tiêu chuẩn
+        type: string
+    type: object
   billing.UpdateVersionInput:
     properties:
       base_price:
@@ -526,6 +538,22 @@ definitions:
       name:
         type: string
       resource:
+        type: string
+    type: object
+  catalog.CreateRouteInput:
+    properties:
+      feature_id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        example: Quản lý Hóa đơn
+        type: string
+      path:
+        example: /finance/invoices
+        type: string
+      route_key:
+        example: finance.invoices
         type: string
     type: object
   catalog.Feature:
@@ -703,6 +731,37 @@ definitions:
       name:
         type: string
     type: object
+  catalog.UpdateMenuInput:
+    properties:
+      feature_id:
+        type: string
+      icon:
+        type: string
+      is_active:
+        type: boolean
+      is_mandatory:
+        type: boolean
+      label:
+        type: string
+      menu_type:
+        type: string
+      parent_id:
+        type: string
+      permission_match_mode:
+        type: string
+      required_permissions:
+        items:
+          type: string
+        type: array
+      route_id:
+        type: string
+      sort_order:
+        type: integer
+      target_portals:
+        items:
+          type: string
+        type: array
+    type: object
   catalog.UpdatePermissionInput:
     properties:
       code:
@@ -714,6 +773,19 @@ definitions:
       is_sensitive:
         type: boolean
       name:
+        type: string
+    type: object
+  catalog.UpdateRouteInput:
+    properties:
+      feature_id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      path:
+        type: string
+      route_key:
         type: string
     type: object
   iam.CreateMemberInput:
@@ -1681,6 +1753,58 @@ definitions:
       tax_code:
         type: string
     type: object
+  tenant_mgmt.DashboardStatsOutput:
+    properties:
+      organizations:
+        properties:
+          active:
+            type: integer
+          archived:
+            type: integer
+          dns_failed:
+            type: integer
+          dns_provisioning:
+            type: integer
+          pending_approval:
+            type: integer
+          suspended:
+            type: integer
+          total:
+            type: integer
+        type: object
+      platform_users:
+        properties:
+          active:
+            type: integer
+          total:
+            type: integer
+        type: object
+      schools_total:
+        type: integer
+      storage:
+        properties:
+          total_files:
+            type: integer
+          total_used_bytes:
+            type: integer
+        type: object
+      subscriptions:
+        properties:
+          active:
+            type: integer
+          expired:
+            type: integer
+          expiring_soon_30d:
+            type: integer
+        type: object
+      support_sessions:
+        properties:
+          active:
+            type: integer
+          pending:
+            type: integer
+        type: object
+    type: object
   tenant_mgmt.Organization:
     properties:
       address:
@@ -1803,6 +1927,35 @@ definitions:
       keyword:
         type: string
       reason:
+        type: string
+    type: object
+  tenant_mgmt.School:
+    properties:
+      address:
+        type: string
+      code:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      is_main:
+        type: boolean
+      level:
+        type: string
+      logo_url:
+        type: string
+      name:
+        type: string
+      organization_id:
+        type: string
+      phone:
+        type: string
+      status:
+        type: string
+      updated_at:
         type: string
     type: object
   tenant_mgmt.SubdomainCheckOutput:
@@ -3240,6 +3393,42 @@ paths:
       tags:
       - Platform Catalog
   /v1/platform/catalog/features/{id}:
+    delete:
+      parameters:
+      - description: Feature ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa tính năng (Feature) khỏi Catalog (chặn core feature hoặc feature
+        đang sử dụng)
+      tags:
+      - Platform Catalog
     put:
       consumes:
       - application/json
@@ -3318,6 +3507,120 @@ paths:
       security:
       - BearerAuth: []
       summary: Tạo node mới trên cây menu nền của Tenant
+      tags:
+      - Platform Catalog
+  /v1/platform/catalog/menus/{id}:
+    delete:
+      parameters:
+      - description: Menu ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa node Menu nền của Tenant (chặn nếu còn mục con)
+      tags:
+      - Platform Catalog
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Menu ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin cập nhật menu
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/catalog.UpdateMenuInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/catalog.TenantBaseMenu'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật node Menu nền của Tenant (nhãn, icon, route, quyền, thứ tự,
+        trạng thái)
+      tags:
+      - Platform Catalog
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Menu ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin cập nhật menu
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/catalog.UpdateMenuInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/catalog.TenantBaseMenu'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật node Menu nền của Tenant (nhãn, icon, route, quyền, thứ tự,
+        trạng thái)
       tags:
       - Platform Catalog
   /v1/platform/catalog/menus/reorder:
@@ -3452,6 +3755,37 @@ paths:
       tags:
       - Platform Catalog
   /v1/platform/catalog/permissions/{id}:
+    delete:
+      parameters:
+      - description: Permission ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa quyền Tenant khỏi Catalog (chặn nếu đang gán cho vai trò)
+      tags:
+      - Platform Catalog
     put:
       consumes:
       - application/json
@@ -3521,6 +3855,140 @@ paths:
       summary: Danh sách Route của Tenant
       tags:
       - Platform Catalog
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin route
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/catalog.CreateRouteInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/catalog.TenantRoute'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tạo mới Tenant Route trong Catalog
+      tags:
+      - Platform Catalog
+  /v1/platform/catalog/routes/{id}:
+    delete:
+      parameters:
+      - description: Route ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa Tenant Route khỏi Catalog (chặn nếu đang được menu tham chiếu)
+      tags:
+      - Platform Catalog
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Route ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin cập nhật route
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/catalog.UpdateRouteInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/catalog.TenantRoute'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật Tenant Route trong Catalog
+      tags:
+      - Platform Catalog
+  /v1/platform/dashboard/stats:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/tenant_mgmt.DashboardStatsOutput'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Thống kê tổng quan nền tảng cho Dashboard quản trị
+      tags:
+      - Platform Dashboard
   /v1/platform/iam/permissions:
     get:
       produces:
@@ -3809,6 +4277,45 @@ paths:
       tags:
       - Platform IAM
   /v1/platform/iam/users/{id}:
+    delete:
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Lý do xóa
+        in: query
+        name: reason
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa mềm nhân sự nền tảng (chặn tự xóa & bảo vệ ROOT_ADMIN cuối cùng)
+      tags:
+      - Platform IAM
     get:
       parameters:
       - description: User ID
@@ -3887,6 +4394,46 @@ paths:
       security:
       - BearerAuth: []
       summary: Cập nhật thông tin hoặc trạng thái nhân sự nền tảng
+      tags:
+      - Platform IAM
+  /v1/platform/iam/users/{id}/mfa/disable:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: reason
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/iam.ForceDisableMFAInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tắt bắt buộc MFA của nhân sự nền tảng
       tags:
       - Platform IAM
   /v1/platform/iam/users/{id}/reset-password:
@@ -4263,6 +4810,105 @@ paths:
       summary: '[Hạn chế sử dụng] Chuyển tệp cấp Platform vào thùng rác theo file_id'
       tags:
       - Platform Media
+  /v1/platform/media/{file_id}/permanent:
+    delete:
+      parameters:
+      - description: File ID
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa vĩnh viễn tệp trong thùng rác cấp Platform khỏi R2/S3 ngay lập
+        tức
+      tags:
+      - Platform Media
+  /v1/platform/media/{file_id}/restore:
+    post:
+      parameters:
+      - description: File ID
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/media.StoredFile'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Khôi phục tệp cấp Platform từ thùng rác
+      tags:
+      - Platform Media
+  /v1/platform/media/{file_id}/url:
+    get:
+      parameters:
+      - description: File ID
+        in: path
+        name: file_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/media.MediaFileURLOutput'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy đường dẫn truy cập (Public hoặc Presigned URL) của tệp cấp Platform
+      tags:
+      - Platform Media
   /v1/platform/media/by-url:
     delete:
       consumes:
@@ -4293,6 +4939,36 @@ paths:
       - BearerAuth: []
       summary: Xóa tệp cấp Platform theo access_url (chuyển vào thùng rác, tự xóa
         khỏi R2 sau N ngày)
+      tags:
+      - Platform Media
+  /v1/platform/media/trash:
+    get:
+      parameters:
+      - description: Trang
+        in: query
+        name: page
+        type: integer
+      - description: Số lượng mỗi trang
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessListResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/media.StoredFile'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Danh sách tệp cấp Platform đang nằm trong thùng rác
       tags:
       - Platform Media
   /v1/platform/media/upload:
@@ -4450,6 +5126,38 @@ paths:
       tags:
       - Platform Organizations
   /v1/platform/organizations/{id}:
+    delete:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Lý do xóa tổ chức
+        in: query
+        name: reason
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa mềm Tổ chức (dọn DNS Cloudflare, thu hồi phiên hỗ trợ & xóa cache
+        Redis)
+      tags:
+      - Platform Organizations
     get:
       parameters:
       - description: Organization ID
@@ -4637,6 +5345,41 @@ paths:
       security:
       - BearerAuth: []
       summary: Thử lại đồng bộ bản ghi Cloudflare DNS cho Tổ chức
+      tags:
+      - Platform Organizations
+  /v1/platform/organizations/{id}/schools:
+    get:
+      parameters:
+      - description: Organization ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/tenant_mgmt.School'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Danh sách trường học trực thuộc một Tổ chức
       tags:
       - Platform Organizations
   /v1/platform/organizations/{id}/status:
@@ -5233,6 +5976,37 @@ paths:
       tags:
       - Platform Organizations
   /v1/platform/package-versions/{version_id}:
+    delete:
+      parameters:
+      - description: Package Version ID
+        in: path
+        name: version_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa phiên bản gói dịch vụ đang ở trạng thái DRAFT
+      tags:
+      - Platform Billing
     put:
       consumes:
       - application/json
@@ -5421,6 +6195,38 @@ paths:
       tags:
       - Platform Billing
   /v1/platform/packages/{id}:
+    delete:
+      parameters:
+      - description: Package ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa gói dịch vụ (chỉ cho phép khi chưa có phiên bản PUBLISHED và chưa
+        có Tổ chức đăng ký)
+      tags:
+      - Platform Billing
     get:
       parameters:
       - description: Package ID
@@ -5451,6 +6257,86 @@ paths:
       security:
       - BearerAuth: []
       summary: Chi tiết gói dịch vụ và các phiên bản
+      tags:
+      - Platform Billing
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Package ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin cập nhật gói
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/billing.UpdatePackageInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.ServicePackage'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật thông tin hoặc trạng thái hiển thị của gói dịch vụ
+      tags:
+      - Platform Billing
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Package ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin cập nhật gói
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/billing.UpdatePackageInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/billing.ServicePackage'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật thông tin hoặc trạng thái hiển thị của gói dịch vụ
       tags:
       - Platform Billing
   /v1/platform/packages/{id}/versions:
@@ -5579,6 +6465,34 @@ paths:
       security:
       - BearerAuth: []
       summary: Thêm từ khóa Subdomain giữ chỗ
+      tags:
+      - Platform Organizations
+  /v1/platform/reserved-subdomains/{keyword}:
+    delete:
+      parameters:
+      - description: Từ khóa subdomain giữ chỗ
+        in: path
+        name: keyword
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Gỡ bỏ từ khóa Subdomain khỏi danh sách giữ chỗ
       tags:
       - Platform Organizations
   /v1/platform/reserved-subdomains/sync-cloudflare:
@@ -6143,6 +7057,46 @@ paths:
       security:
       - BearerAuth: []
       summary: Tạo mới nhân sự nền tảng
+      tags:
+      - Platform IAM
+  /v1/platform/users/{id}:
+    delete:
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Lý do xóa
+        in: query
+        name: reason
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa mềm nhân sự nền tảng (chặn tự xóa & bảo vệ ROOT_ADMIN cuối cùng)
       tags:
       - Platform IAM
   /v1/platform/users/{id}/mfa:

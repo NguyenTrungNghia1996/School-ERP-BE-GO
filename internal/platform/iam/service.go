@@ -269,6 +269,68 @@ func (s *Service) UpdateUser(ctx context.Context, targetUserID uuid.UUID, input 
 	return s.GetUserDetail(ctx, targetUserID)
 }
 
+// DeleteUser soft-deletes a platform user, protecting against self-deletion and deleting the last active ROOT_ADMIN.
+func (s *Service) DeleteUser(ctx context.Context, targetUserID, actorID uuid.UUID, reason, ip, ua string) error {
+	if targetUserID == actorID {
+		return ErrSelfModificationNotAllow
+	}
+
+	var user PlatformUser
+	if err := s.db.WithContext(ctx).First(&user, "id = ?", targetUserID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrUserNotFound
+		}
+		return err
+	}
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if user.Status == "ACTIVE" {
+			if err := s.ensureNotLastRootAdmin(tx, targetUserID); err != nil {
+				return err
+			}
+		}
+
+		if err := tx.Where("platform_user_id = ?", targetUserID).Delete(&PlatformUserRole{}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&user).Updates(map[string]any{
+			"status":     "INACTIVE",
+			"updated_at": time.Now(),
+		}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&user).Error; err != nil {
+			return err
+		}
+
+		return s.logAudit(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &actorID,
+			Action:       "PLATFORM_USER_DELETED",
+			ResourceType: "PLATFORM_USER",
+			ResourceID:   &targetUserID,
+			BeforeData: map[string]any{
+				"id":        user.ID,
+				"email":     user.Email,
+				"full_name": user.FullName,
+				"status":    user.Status,
+			},
+			Reason:    reason,
+			IPAddress: ip,
+			UserAgent: ua,
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	s.revokeAllUserSessions(ctx, targetUserID.String())
+	s.invalidateUsersAuthzCache(ctx, []string{targetUserID.String()})
+	return nil
+}
+
 func (s *Service) UpdateUserRoles(ctx context.Context, targetUserID uuid.UUID, roleIDs []uuid.UUID, actorID uuid.UUID, ip, ua string) error {
 	if targetUserID == actorID {
 		return ErrSelfModificationNotAllow
