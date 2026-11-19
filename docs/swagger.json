@@ -35,6 +35,1329 @@
                 }
             }
         },
+        "/v1/auth/login": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Auth"
+                ],
+                "summary": "Đăng nhập người dùng Đơn vị / Trường học (Tenant)",
+                "parameters": [
+                    {
+                        "description": "subdomain, identifier (email/username/phone), password",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.TenantLoginInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/auth.TenantLoginOutput"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Auth"
+                ],
+                "summary": "Đăng xuất phiên người dùng Đơn vị",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/refresh": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Auth"
+                ],
+                "summary": "Làm mới Access Token Tenant",
+                "parameters": [
+                    {
+                        "description": "refresh_token",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.TenantRefreshInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/auth.TenantLoginOutput"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/switch-school": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Auth"
+                ],
+                "summary": "Chuyển đổi trường học đang thao tác trong cùng 1 Đơn vị",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "school_id",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.SwitchSchoolInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/auth.TenantLoginOutput"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/entitled-permissions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant IAM"
+                ],
+                "summary": "Danh sách quyền từ Catalog mà Đơn vị được phép dùng theo gói dịch vụ",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/iam.EntitledPermissionItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/members": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant IAM"
+                ],
+                "summary": "Danh sách thành viên thuộc trường hiện tại",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "School ID đang chọn",
+                        "name": "X-School-ID",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tìm kiếm",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Trạng thái (ACTIVE, SUSPENDED, INACTIVE)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Trang",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Số lượng mỗi trang",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessListResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/iam.SchoolMembership"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant IAM"
+                ],
+                "summary": "Thêm thành viên vào trường (tái sử dụng user nếu email/phone đã tồn tại - Single Account Identity)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "School ID đang chọn",
+                        "name": "X-School-ID",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Thông tin thành viên",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/iam.CreateMemberInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/iam.SchoolMembership"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/members/{membership_id}/roles": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant IAM"
+                ],
+                "summary": "Cập nhật danh sách vai trò của thành viên (chống gỡ SCHOOL_ADMIN cuối cùng)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Membership ID",
+                        "name": "membership_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Danh sách role_ids",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/iam.UpdateMemberRolesInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/members/{membership_id}/status": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant IAM"
+                ],
+                "summary": "Khóa / Mở khóa hoặc tạm ngưng thành viên trong trường",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Membership ID",
+                        "name": "membership_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "status, reason",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/iam.UpdateMemberStatusInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/roles": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant IAM"
+                ],
+                "summary": "Danh sách vai trò của Đơn vị",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/iam.TenantRole"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant IAM"
+                ],
+                "summary": "Tạo vai trò tùy chỉnh của Đơn vị (kiểm tra Entitlement cho từng permission_id)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Thông tin vai trò",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/school-erp_internal_tenant_iam.CreateRoleInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/iam.TenantRole"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/iam/roles/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant IAM"
+                ],
+                "summary": "Cập nhật vai trò và quyền (tự động xóa cache Redis của toàn bộ thành viên giữ vai trò này)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Role ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Thông tin cập nhật vai trò",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/school-erp_internal_tenant_iam.UpdateRoleInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/iam.TenantRole"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant IAM"
+                ],
+                "summary": "Xóa vai trò tùy chỉnh của Đơn vị",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Role ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Auth"
+                ],
+                "summary": "Lấy thông tin ngữ cảnh người dùng Đơn vị kèm cây Menu động đã lọc",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "School ID đang chọn",
+                        "name": "X-School-ID",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/auth.TenantMeOutput"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/menus/custom-items": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Menu"
+                ],
+                "summary": "Tạo lối tắt menu riêng trỏ tới route hợp lệ thuộc gói của Đơn vị",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Thông tin menu riêng",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/menu.CreateCustomMenuInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/menu.OrganizationMenuConfig"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/menus/custom-items/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Menu"
+                ],
+                "summary": "Xóa lối tắt menu riêng của Đơn vị",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Custom Menu Config ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/menus/customize": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Menu"
+                ],
+                "summary": "Tùy chỉnh nhãn, icon, thứ tự và ẩn/hiện menu của Đơn vị",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Danh sách cấu hình menu",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/menu.CustomizeMenusInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/menus/manage": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Menu"
+                ],
+                "summary": "Lấy cây menu quản trị của Đơn vị (Menu nền + Tùy chỉnh)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/menu.DynamicMenuNode"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/menus/routes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Menu"
+                ],
+                "summary": "Danh sách Route khả dụng theo gói của Đơn vị (dùng cho dropdown tạo menu riêng)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/menu.EntitledRouteItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/organization": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Organization"
+                ],
+                "summary": "Xem thông tin Đơn vị và trạng thái gói dịch vụ đang sử dụng",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/org_school.OrganizationOverviewOutput"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Organization"
+                ],
+                "summary": "Cập nhật thông tin liên hệ, địa chỉ, logo của Đơn vị (không đổi subdomain)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Thông tin cập nhật",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/org_school.UpdateOrganizationInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/org_school.Organization"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/platform/audit-logs": {
             "get": {
                 "security": [
@@ -1000,7 +2323,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/iam.CreateRoleInput"
+                            "$ref": "#/definitions/school-erp_internal_platform_iam.CreateRoleInput"
                         }
                     }
                 ],
@@ -1124,7 +2447,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/iam.UpdateRoleInput"
+                            "$ref": "#/definitions/school-erp_internal_platform_iam.UpdateRoleInput"
                         }
                     }
                 ],
@@ -3809,7 +5132,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/iam.CreateRoleInput"
+                            "$ref": "#/definitions/school-erp_internal_platform_iam.CreateRoleInput"
                         }
                     }
                 ],
@@ -5022,6 +6345,209 @@
                     }
                 }
             }
+        },
+        "/v1/schools": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Schools"
+                ],
+                "summary": "Danh sách các trường học trực thuộc Đơn vị (cô lập bởi RLS)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/org_school.School"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Schools"
+                ],
+                "summary": "Tạo trường học mới trực thuộc Đơn vị (kiểm tra hạn mức max_schools)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Thông tin trường mới",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/org_school.CreateSchoolInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/org_school.School"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/schools/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant Schools"
+                ],
+                "summary": "Cập nhật thông tin trường học trực thuộc Đơn vị",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subdomain của Đơn vị",
+                        "name": "X-Tenant-Subdomain",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "School ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Thông tin cập nhật",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/org_school.UpdateSchoolInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/org_school.School"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -5158,6 +6684,130 @@
                 "user": {
                     "type": "object",
                     "additionalProperties": {}
+                }
+            }
+        },
+        "auth.MeSchoolItem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "member_type": {
+                    "type": "string"
+                },
+                "membership_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "auth.SwitchSchoolInput": {
+            "type": "object",
+            "properties": {
+                "school_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "auth.TenantLoginInput": {
+            "type": "object",
+            "properties": {
+                "identifier": {
+                    "type": "string",
+                    "example": "admin@chuvanan.edu.vn"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "Admin@123456"
+                },
+                "subdomain": {
+                    "type": "string",
+                    "example": "thpt-chu-van-an"
+                }
+            }
+        },
+        "auth.TenantLoginOutput": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "active_school_id": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer",
+                    "example": 900
+                },
+                "organization_id": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string",
+                    "example": "Bearer"
+                }
+            }
+        },
+        "auth.TenantMeOutput": {
+            "type": "object",
+            "properties": {
+                "active_school_id": {
+                    "type": "string"
+                },
+                "is_support_mode": {
+                    "type": "boolean"
+                },
+                "menus": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menu.DynamicMenuNode"
+                    }
+                },
+                "organization": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "schools": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/auth.MeSchoolItem"
+                    }
+                },
+                "user": {
+                    "type": "object",
+                    "additionalProperties": {}
+                }
+            }
+        },
+        "auth.TenantRefreshInput": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
                 }
             }
         },
@@ -5959,26 +7609,38 @@
                 }
             }
         },
-        "iam.CreateRoleInput": {
+        "iam.CreateMemberInput": {
             "type": "object",
             "properties": {
-                "code": {
+                "email": {
                     "type": "string",
-                    "example": "SUPPORT_AGENT"
+                    "example": "gv.toan@chuvanan.edu.vn"
                 },
-                "description": {
+                "full_name": {
                     "type": "string",
-                    "example": "Hỗ trợ vận hành các trường học"
+                    "example": "Nguyễn Văn A"
                 },
-                "name": {
+                "member_type": {
                     "type": "string",
-                    "example": "Chuyên viên Hỗ trợ"
+                    "example": "TEACHER"
                 },
-                "permission_ids": {
+                "password": {
+                    "type": "string",
+                    "example": "TempPass@2026"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "0912345678"
+                },
+                "role_ids": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
+                },
+                "username": {
+                    "type": "string",
+                    "example": "gv_toan"
                 }
             }
         },
@@ -6010,6 +7672,35 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "iam.EntitledPermissionItem": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "feature_code": {
+                    "type": "string"
+                },
+                "feature_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_sensitive": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "resource": {
+                    "type": "string"
                 }
             }
         },
@@ -6288,26 +7979,150 @@
                 }
             }
         },
-        "iam.UpdateRoleInput": {
+        "iam.SchoolMembership": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_school_admin": {
+                    "type": "boolean"
+                },
+                "joined_at": {
+                    "type": "string"
+                },
+                "member_type": {
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "string"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/iam.TenantRole"
+                    }
+                },
+                "school_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/iam.TenantUser"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "iam.TenantRole": {
             "type": "object",
             "properties": {
                 "code": {
-                    "type": "string",
-                    "example": "SUPPORT_AGENT"
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "data_scope": {
+                    "type": "string"
                 },
                 "description": {
-                    "type": "string",
-                    "example": "Hỗ trợ vận hành các trường học"
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_system": {
+                    "type": "boolean"
                 },
                 "name": {
-                    "type": "string",
-                    "example": "Chuyên viên Hỗ trợ"
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "string"
                 },
                 "permission_ids": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
+                },
+                "school_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "iam.TenantUser": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_login_at": {
+                    "type": "string"
+                },
+                "must_change_password": {
+                    "type": "boolean"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "iam.UpdateMemberRolesInput": {
+            "type": "object",
+            "properties": {
+                "role_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "iam.UpdateMemberStatusInput": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "example": "Tạm ngưng công tác"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "SUSPENDED"
                 }
             }
         },
@@ -6511,6 +8326,368 @@
                 }
             }
         },
+        "menu.CreateCustomMenuInput": {
+            "type": "object",
+            "properties": {
+                "custom_icon": {
+                    "type": "string",
+                    "example": "BarChartOutlined"
+                },
+                "custom_label": {
+                    "type": "string",
+                    "example": "Báo cáo nhanh"
+                },
+                "parent_config_id": {
+                    "type": "string"
+                },
+                "route_id": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer",
+                    "example": 10
+                }
+            }
+        },
+        "menu.CustomizeMenuItemInput": {
+            "type": "object",
+            "properties": {
+                "base_menu_id": {
+                    "type": "string"
+                },
+                "config_id": {
+                    "type": "string"
+                },
+                "custom_icon": {
+                    "type": "string",
+                    "example": "BookOutlined"
+                },
+                "custom_label": {
+                    "type": "string",
+                    "example": "Quản lý Lớp học"
+                },
+                "is_visible": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "sort_order": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "menu.CustomizeMenusInput": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menu.CustomizeMenuItemInput"
+                    }
+                }
+            }
+        },
+        "menu.DynamicMenuNode": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menu.DynamicMenuNode"
+                    }
+                },
+                "config_id": {
+                    "type": "string"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_custom": {
+                    "type": "boolean"
+                },
+                "is_mandatory": {
+                    "type": "boolean"
+                },
+                "is_visible": {
+                    "type": "boolean"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "menu_type": {
+                    "type": "string"
+                },
+                "route_path": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
+                }
+            }
+        },
+        "menu.EntitledRouteItem": {
+            "type": "object",
+            "properties": {
+                "feature_code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "route_key": {
+                    "type": "string"
+                }
+            }
+        },
+        "menu.OrganizationMenuConfig": {
+            "type": "object",
+            "properties": {
+                "base_menu_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "custom_icon": {
+                    "type": "string"
+                },
+                "custom_label": {
+                    "type": "string"
+                },
+                "custom_route_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_visible": {
+                    "type": "boolean"
+                },
+                "organization_id": {
+                    "type": "string"
+                },
+                "parent_config_id": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "org_school.CreateSchoolInput": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string",
+                    "example": "CS2"
+                },
+                "education_levels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "HIGH_SCHOOL"
+                    ]
+                },
+                "email": {
+                    "type": "string",
+                    "example": "cs2@chuvanan.edu.vn"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Cơ sở 2 - THPT Chu Văn An"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "02438889998"
+                }
+            }
+        },
+        "org_school.Organization": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "contact_email": {
+                    "type": "string"
+                },
+                "contact_phone": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "settings": {
+                    "type": "object"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "subdomain": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "org_school.OrganizationOverviewOutput": {
+            "type": "object",
+            "properties": {
+                "entitlement": {
+                    "$ref": "#/definitions/billing.OrganizationEntitlement"
+                },
+                "max_schools": {
+                    "type": "integer"
+                },
+                "organization": {
+                    "$ref": "#/definitions/org_school.Organization"
+                },
+                "school_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "org_school.School": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "education_levels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_main": {
+                    "type": "boolean"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "org_school.UpdateOrganizationInput": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "example": "Số 10 Thụy Khuê, Tây Hồ, Hà Nội"
+                },
+                "contact_email": {
+                    "type": "string",
+                    "example": "contact@chuvanan.edu.vn"
+                },
+                "contact_phone": {
+                    "type": "string",
+                    "example": "02438889999"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Hệ thống Trường Chu Văn An"
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": {}
+                }
+            }
+        },
+        "org_school.UpdateSchoolInput": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "education_levels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "email": {
+                    "type": "string"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "ACTIVE"
+                }
+            }
+        },
         "response.ErrorBody": {
             "type": "object",
             "properties": {
@@ -6586,6 +8763,103 @@
                 "success": {
                     "type": "boolean",
                     "example": true
+                }
+            }
+        },
+        "school-erp_internal_platform_iam.CreateRoleInput": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "SUPPORT_AGENT"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Hỗ trợ vận hành các trường học"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Chuyên viên Hỗ trợ"
+                },
+                "permission_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "school-erp_internal_platform_iam.UpdateRoleInput": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "SUPPORT_AGENT"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Hỗ trợ vận hành các trường học"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Chuyên viên Hỗ trợ"
+                },
+                "permission_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "school-erp_internal_tenant_iam.CreateRoleInput": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "TEACHER_HOMEROOM"
+                },
+                "data_scope": {
+                    "type": "string",
+                    "example": "ASSIGNED_CLASS"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Giáo viên Chủ nhiệm"
+                },
+                "permission_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "school_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "school-erp_internal_tenant_iam.UpdateRoleInput": {
+            "type": "object",
+            "properties": {
+                "data_scope": {
+                    "type": "string",
+                    "example": "ASSIGNED_CLASS"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Giáo viên Chủ nhiệm"
+                },
+                "permission_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },

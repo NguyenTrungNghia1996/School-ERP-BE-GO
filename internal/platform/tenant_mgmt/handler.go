@@ -113,9 +113,8 @@ func (h *Handler) CreateOrganization(c *fiber.Ctx) error {
 	if err := c.BodyParser(&body); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu đầu vào không hợp lệ", err.Error())
 	}
-	if strings.TrimSpace(body.Name) == "" || strings.TrimSpace(body.Subdomain) == "" ||
-		strings.TrimSpace(body.Admin.Email) == "" || strings.TrimSpace(body.Admin.Password) == "" || strings.TrimSpace(body.Admin.FullName) == "" {
-		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Tên tổ chức, subdomain và thông tin tài khoản School Admin đầu tiên là bắt buộc", nil)
+	if strings.TrimSpace(body.Name) == "" || strings.TrimSpace(body.Subdomain) == "" {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Tên tổ chức (name) và subdomain là bắt buộc", nil)
 	}
 
 	body.ActorID = getActorUUID(c)

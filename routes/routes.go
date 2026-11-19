@@ -3,6 +3,7 @@ package routes
 import (
 	"school-erp/controllers"
 	"school-erp/internal/platform"
+	"school-erp/internal/tenant"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/swagger"
@@ -15,4 +16,5 @@ func Setup(app *fiber.App) {
 	api.Get("/health", controllers.HealthCheck)
 
 	platform.RegisterRoutes(api)
+	tenant.RegisterRoutes(api)
 }

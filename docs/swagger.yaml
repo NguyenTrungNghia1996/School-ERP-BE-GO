@@ -93,6 +93,89 @@ definitions:
         additionalProperties: {}
         type: object
     type: object
+  auth.MeSchoolItem:
+    properties:
+      code:
+        type: string
+      id:
+        type: string
+      member_type:
+        type: string
+      membership_id:
+        type: string
+      name:
+        type: string
+      status:
+        type: string
+    type: object
+  auth.SwitchSchoolInput:
+    properties:
+      school_id:
+        type: string
+    type: object
+  auth.TenantLoginInput:
+    properties:
+      identifier:
+        example: admin@chuvanan.edu.vn
+        type: string
+      password:
+        example: Admin@123456
+        type: string
+      subdomain:
+        example: thpt-chu-van-an
+        type: string
+    type: object
+  auth.TenantLoginOutput:
+    properties:
+      access_token:
+        type: string
+      active_school_id:
+        type: string
+      expires_in:
+        example: 900
+        type: integer
+      organization_id:
+        type: string
+      refresh_token:
+        type: string
+      token_type:
+        example: Bearer
+        type: string
+    type: object
+  auth.TenantMeOutput:
+    properties:
+      active_school_id:
+        type: string
+      is_support_mode:
+        type: boolean
+      menus:
+        items:
+          $ref: '#/definitions/menu.DynamicMenuNode'
+        type: array
+      organization:
+        additionalProperties: {}
+        type: object
+      permissions:
+        items:
+          type: string
+        type: array
+      roles:
+        items:
+          type: string
+        type: array
+      schools:
+        items:
+          $ref: '#/definitions/auth.MeSchoolItem'
+        type: array
+      user:
+        additionalProperties: {}
+        type: object
+    type: object
+  auth.TenantRefreshInput:
+    properties:
+      refresh_token:
+        type: string
+    type: object
   billing.ActivePackageSummary:
     properties:
       expires_at:
@@ -621,21 +704,30 @@ definitions:
       name:
         type: string
     type: object
-  iam.CreateRoleInput:
+  iam.CreateMemberInput:
     properties:
-      code:
-        example: SUPPORT_AGENT
+      email:
+        example: gv.toan@chuvanan.edu.vn
         type: string
-      description:
-        example: Hỗ trợ vận hành các trường học
+      full_name:
+        example: Nguyễn Văn A
         type: string
-      name:
-        example: Chuyên viên Hỗ trợ
+      member_type:
+        example: TEACHER
         type: string
-      permission_ids:
+      password:
+        example: TempPass@2026
+        type: string
+      phone:
+        example: "0912345678"
+        type: string
+      role_ids:
         items:
           type: string
         type: array
+      username:
+        example: gv_toan
+        type: string
     type: object
   iam.CreateUserInput:
     properties:
@@ -658,6 +750,25 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  iam.EntitledPermissionItem:
+    properties:
+      action:
+        type: string
+      code:
+        type: string
+      feature_code:
+        type: string
+      feature_name:
+        type: string
+      id:
+        type: string
+      is_sensitive:
+        type: boolean
+      name:
+        type: string
+      resource:
+        type: string
     type: object
   iam.ForceDisableMFAInput:
     properties:
@@ -842,21 +953,102 @@ definitions:
       user_count:
         type: integer
     type: object
-  iam.UpdateRoleInput:
+  iam.SchoolMembership:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      is_school_admin:
+        type: boolean
+      joined_at:
+        type: string
+      member_type:
+        type: string
+      organization_id:
+        type: string
+      roles:
+        items:
+          $ref: '#/definitions/iam.TenantRole'
+        type: array
+      school_id:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/iam.TenantUser'
+      user_id:
+        type: string
+    type: object
+  iam.TenantRole:
     properties:
       code:
-        example: SUPPORT_AGENT
+        type: string
+      created_at:
+        type: string
+      data_scope:
         type: string
       description:
-        example: Hỗ trợ vận hành các trường học
         type: string
+      id:
+        type: string
+      is_system:
+        type: boolean
       name:
-        example: Chuyên viên Hỗ trợ
+        type: string
+      organization_id:
         type: string
       permission_ids:
         items:
           type: string
         type: array
+      school_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  iam.TenantUser:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: string
+      last_login_at:
+        type: string
+      must_change_password:
+        type: boolean
+      phone:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  iam.UpdateMemberRolesInput:
+    properties:
+      role_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  iam.UpdateMemberStatusInput:
+    properties:
+      reason:
+        example: Tạm ngưng công tác
+        type: string
+      status:
+        example: SUSPENDED
+        type: string
     type: object
   iam.UpdateRolePermissionsInput:
     properties:
@@ -993,6 +1185,249 @@ definitions:
       type:
         type: string
     type: object
+  menu.CreateCustomMenuInput:
+    properties:
+      custom_icon:
+        example: BarChartOutlined
+        type: string
+      custom_label:
+        example: Báo cáo nhanh
+        type: string
+      parent_config_id:
+        type: string
+      route_id:
+        type: string
+      sort_order:
+        example: 10
+        type: integer
+    type: object
+  menu.CustomizeMenuItemInput:
+    properties:
+      base_menu_id:
+        type: string
+      config_id:
+        type: string
+      custom_icon:
+        example: BookOutlined
+        type: string
+      custom_label:
+        example: Quản lý Lớp học
+        type: string
+      is_visible:
+        example: true
+        type: boolean
+      sort_order:
+        example: 1
+        type: integer
+    type: object
+  menu.CustomizeMenusInput:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/menu.CustomizeMenuItemInput'
+        type: array
+    type: object
+  menu.DynamicMenuNode:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/menu.DynamicMenuNode'
+        type: array
+      config_id:
+        type: string
+      icon:
+        type: string
+      id:
+        type: string
+      is_custom:
+        type: boolean
+      is_mandatory:
+        type: boolean
+      is_visible:
+        type: boolean
+      key:
+        type: string
+      label:
+        type: string
+      menu_type:
+        type: string
+      route_path:
+        type: string
+      sort_order:
+        type: integer
+    type: object
+  menu.EntitledRouteItem:
+    properties:
+      feature_code:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      route_key:
+        type: string
+    type: object
+  menu.OrganizationMenuConfig:
+    properties:
+      base_menu_id:
+        type: string
+      created_at:
+        type: string
+      custom_icon:
+        type: string
+      custom_label:
+        type: string
+      custom_route_id:
+        type: string
+      id:
+        type: string
+      is_visible:
+        type: boolean
+      organization_id:
+        type: string
+      parent_config_id:
+        type: string
+      sort_order:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  org_school.CreateSchoolInput:
+    properties:
+      address:
+        type: string
+      code:
+        example: CS2
+        type: string
+      education_levels:
+        example:
+        - HIGH_SCHOOL
+        items:
+          type: string
+        type: array
+      email:
+        example: cs2@chuvanan.edu.vn
+        type: string
+      logo_url:
+        type: string
+      name:
+        example: Cơ sở 2 - THPT Chu Văn An
+        type: string
+      phone:
+        example: "02438889998"
+        type: string
+    type: object
+  org_school.Organization:
+    properties:
+      address:
+        type: string
+      code:
+        type: string
+      contact_email:
+        type: string
+      contact_phone:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      logo_url:
+        type: string
+      name:
+        type: string
+      settings:
+        type: object
+      status:
+        type: string
+      subdomain:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  org_school.OrganizationOverviewOutput:
+    properties:
+      entitlement:
+        $ref: '#/definitions/billing.OrganizationEntitlement'
+      max_schools:
+        type: integer
+      organization:
+        $ref: '#/definitions/org_school.Organization'
+      school_count:
+        type: integer
+    type: object
+  org_school.School:
+    properties:
+      address:
+        type: string
+      code:
+        type: string
+      created_at:
+        type: string
+      education_levels:
+        items:
+          type: string
+        type: array
+      email:
+        type: string
+      id:
+        type: string
+      is_main:
+        type: boolean
+      logo_url:
+        type: string
+      name:
+        type: string
+      organization_id:
+        type: string
+      phone:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  org_school.UpdateOrganizationInput:
+    properties:
+      address:
+        example: Số 10 Thụy Khuê, Tây Hồ, Hà Nội
+        type: string
+      contact_email:
+        example: contact@chuvanan.edu.vn
+        type: string
+      contact_phone:
+        example: "02438889999"
+        type: string
+      logo_url:
+        type: string
+      name:
+        example: Hệ thống Trường Chu Văn An
+        type: string
+      settings:
+        additionalProperties: {}
+        type: object
+    type: object
+  org_school.UpdateSchoolInput:
+    properties:
+      address:
+        type: string
+      education_levels:
+        items:
+          type: string
+        type: array
+      email:
+        type: string
+      logo_url:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      status:
+        example: ACTIVE
+        type: string
+    type: object
   response.ErrorBody:
     properties:
       code:
@@ -1047,6 +1482,73 @@ definitions:
       success:
         example: true
         type: boolean
+    type: object
+  school-erp_internal_platform_iam.CreateRoleInput:
+    properties:
+      code:
+        example: SUPPORT_AGENT
+        type: string
+      description:
+        example: Hỗ trợ vận hành các trường học
+        type: string
+      name:
+        example: Chuyên viên Hỗ trợ
+        type: string
+      permission_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  school-erp_internal_platform_iam.UpdateRoleInput:
+    properties:
+      code:
+        example: SUPPORT_AGENT
+        type: string
+      description:
+        example: Hỗ trợ vận hành các trường học
+        type: string
+      name:
+        example: Chuyên viên Hỗ trợ
+        type: string
+      permission_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  school-erp_internal_tenant_iam.CreateRoleInput:
+    properties:
+      code:
+        example: TEACHER_HOMEROOM
+        type: string
+      data_scope:
+        example: ASSIGNED_CLASS
+        type: string
+      description:
+        type: string
+      name:
+        example: Giáo viên Chủ nhiệm
+        type: string
+      permission_ids:
+        items:
+          type: string
+        type: array
+      school_id:
+        type: string
+    type: object
+  school-erp_internal_tenant_iam.UpdateRoleInput:
+    properties:
+      data_scope:
+        example: ASSIGNED_CLASS
+        type: string
+      description:
+        type: string
+      name:
+        example: Giáo viên Chủ nhiệm
+        type: string
+      permission_ids:
+        items:
+          type: string
+        type: array
     type: object
   support.CreateSessionInput:
     properties:
@@ -1318,6 +1820,810 @@ paths:
       summary: Check API, database and Redis health
       tags:
       - Health
+  /v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: subdomain, identifier (email/username/phone), password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.TenantLoginInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.TenantLoginOutput'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Đăng nhập người dùng Đơn vị / Trường học (Tenant)
+      tags:
+      - Tenant Auth
+  /v1/auth/logout:
+    post:
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+      security:
+      - BearerAuth: []
+      summary: Đăng xuất phiên người dùng Đơn vị
+      tags:
+      - Tenant Auth
+  /v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: refresh_token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.TenantRefreshInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.TenantLoginOutput'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Làm mới Access Token Tenant
+      tags:
+      - Tenant Auth
+  /v1/auth/switch-school:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: school_id
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.SwitchSchoolInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.TenantLoginOutput'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Chuyển đổi trường học đang thao tác trong cùng 1 Đơn vị
+      tags:
+      - Tenant Auth
+  /v1/iam/entitled-permissions:
+    get:
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/iam.EntitledPermissionItem'
+                  type: array
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Danh sách quyền từ Catalog mà Đơn vị được phép dùng theo gói dịch vụ
+      tags:
+      - Tenant IAM
+  /v1/iam/members:
+    get:
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: School ID đang chọn
+        in: header
+        name: X-School-ID
+        type: string
+      - description: Tìm kiếm
+        in: query
+        name: search
+        type: string
+      - description: Trạng thái (ACTIVE, SUSPENDED, INACTIVE)
+        in: query
+        name: status
+        type: string
+      - description: Trang
+        in: query
+        name: page
+        type: integer
+      - description: Số lượng mỗi trang
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessListResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/iam.SchoolMembership'
+                  type: array
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Danh sách thành viên thuộc trường hiện tại
+      tags:
+      - Tenant IAM
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: School ID đang chọn
+        in: header
+        name: X-School-ID
+        type: string
+      - description: Thông tin thành viên
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/iam.CreateMemberInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/iam.SchoolMembership'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Thêm thành viên vào trường (tái sử dụng user nếu email/phone đã tồn
+        tại - Single Account Identity)
+      tags:
+      - Tenant IAM
+  /v1/iam/members/{membership_id}/roles:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: Membership ID
+        in: path
+        name: membership_id
+        required: true
+        type: string
+      - description: Danh sách role_ids
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/iam.UpdateMemberRolesInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật danh sách vai trò của thành viên (chống gỡ SCHOOL_ADMIN cuối
+        cùng)
+      tags:
+      - Tenant IAM
+  /v1/iam/members/{membership_id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: Membership ID
+        in: path
+        name: membership_id
+        required: true
+        type: string
+      - description: status, reason
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/iam.UpdateMemberStatusInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Khóa / Mở khóa hoặc tạm ngưng thành viên trong trường
+      tags:
+      - Tenant IAM
+  /v1/iam/roles:
+    get:
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/iam.TenantRole'
+                  type: array
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Danh sách vai trò của Đơn vị
+      tags:
+      - Tenant IAM
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: Thông tin vai trò
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/school-erp_internal_tenant_iam.CreateRoleInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/iam.TenantRole'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tạo vai trò tùy chỉnh của Đơn vị (kiểm tra Entitlement cho từng permission_id)
+      tags:
+      - Tenant IAM
+  /v1/iam/roles/{id}:
+    delete:
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa vai trò tùy chỉnh của Đơn vị
+      tags:
+      - Tenant IAM
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin cập nhật vai trò
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/school-erp_internal_tenant_iam.UpdateRoleInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/iam.TenantRole'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật vai trò và quyền (tự động xóa cache Redis của toàn bộ thành
+        viên giữ vai trò này)
+      tags:
+      - Tenant IAM
+  /v1/me:
+    get:
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: School ID đang chọn
+        in: header
+        name: X-School-ID
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.TenantMeOutput'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy thông tin ngữ cảnh người dùng Đơn vị kèm cây Menu động đã lọc
+      tags:
+      - Tenant Auth
+  /v1/menus/custom-items:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: Thông tin menu riêng
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/menu.CreateCustomMenuInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/menu.OrganizationMenuConfig'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tạo lối tắt menu riêng trỏ tới route hợp lệ thuộc gói của Đơn vị
+      tags:
+      - Tenant Menu
+  /v1/menus/custom-items/{id}:
+    delete:
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: Custom Menu Config ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa lối tắt menu riêng của Đơn vị
+      tags:
+      - Tenant Menu
+  /v1/menus/customize:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: Danh sách cấu hình menu
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/menu.CustomizeMenusInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tùy chỉnh nhãn, icon, thứ tự và ẩn/hiện menu của Đơn vị
+      tags:
+      - Tenant Menu
+  /v1/menus/manage:
+    get:
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/menu.DynamicMenuNode'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy cây menu quản trị của Đơn vị (Menu nền + Tùy chỉnh)
+      tags:
+      - Tenant Menu
+  /v1/menus/routes:
+    get:
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/menu.EntitledRouteItem'
+                  type: array
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Danh sách Route khả dụng theo gói của Đơn vị (dùng cho dropdown tạo
+        menu riêng)
+      tags:
+      - Tenant Menu
+  /v1/organization:
+    get:
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/org_school.OrganizationOverviewOutput'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xem thông tin Đơn vị và trạng thái gói dịch vụ đang sử dụng
+      tags:
+      - Tenant Organization
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: Thông tin cập nhật
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/org_school.UpdateOrganizationInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/org_school.Organization'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật thông tin liên hệ, địa chỉ, logo của Đơn vị (không đổi subdomain)
+      tags:
+      - Tenant Organization
   /v1/platform/audit-logs:
     get:
       parameters:
@@ -1882,7 +3188,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/iam.CreateRoleInput'
+          $ref: '#/definitions/school-erp_internal_platform_iam.CreateRoleInput'
       produces:
       - application/json
       responses:
@@ -1990,7 +3296,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/iam.UpdateRoleInput'
+          $ref: '#/definitions/school-erp_internal_platform_iam.UpdateRoleInput'
       produces:
       - application/json
       responses:
@@ -3555,7 +4861,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/iam.CreateRoleInput'
+          $ref: '#/definitions/school-erp_internal_platform_iam.CreateRoleInput'
       produces:
       - application/json
       responses:
@@ -4299,6 +5605,127 @@ paths:
       summary: Phân giải Subdomain của Tổ chức & Redirect 301/308 (Public)
       tags:
       - Public Tenant
+  /v1/schools:
+    get:
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/org_school.School'
+                  type: array
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Danh sách các trường học trực thuộc Đơn vị (cô lập bởi RLS)
+      tags:
+      - Tenant Schools
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: Thông tin trường mới
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/org_school.CreateSchoolInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/org_school.School'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tạo trường học mới trực thuộc Đơn vị (kiểm tra hạn mức max_schools)
+      tags:
+      - Tenant Schools
+  /v1/schools/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subdomain của Đơn vị
+        in: header
+        name: X-Tenant-Subdomain
+        required: true
+        type: string
+      - description: School ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin cập nhật
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/org_school.UpdateSchoolInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/org_school.School'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật thông tin trường học trực thuộc Đơn vị
+      tags:
+      - Tenant Schools
 securityDefinitions:
   BearerAuth:
     description: 'Nhập theo cú pháp: Bearer <token>'

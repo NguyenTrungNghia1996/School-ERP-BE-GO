@@ -256,7 +256,23 @@ func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizati
 		schoolName = strings.TrimSpace(input.Name)
 	}
 
-	hashedPass, err := bcrypt.GenerateFromPassword([]byte(input.Admin.Password), bcrypt.DefaultCost)
+	// Tài khoản School Admin mặc định ban đầu cho mọi đơn vị nếu không truyền tường minh
+	adminEmail := strings.ToLower(strings.TrimSpace(input.Admin.Email))
+	if adminEmail == "" {
+		adminEmail = fmt.Sprintf("admin@%s.school-erp.vn", subdomain)
+	}
+	adminPassword := strings.TrimSpace(input.Admin.Password)
+	usedDefaultPassword := false
+	if adminPassword == "" {
+		adminPassword = "Admin@123456"
+		usedDefaultPassword = true
+	}
+	adminFullName := strings.TrimSpace(input.Admin.FullName)
+	if adminFullName == "" {
+		adminFullName = fmt.Sprintf("Quản trị viên %s", strings.TrimSpace(input.Name))
+	}
+
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
@@ -289,6 +305,11 @@ func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizati
 			return err
 		}
 
+		// Thiết lập tenant context cục bộ cho transaction nhằm tương thích PostgreSQL RLS
+		if err := tx.Exec("SELECT set_config('app.organization_id', ?, true)", org.ID.String()).Error; err != nil {
+			return err
+		}
+
 		school = School{
 			ID:             uuid.New(),
 			OrganizationID: org.ID,
@@ -305,7 +326,6 @@ func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizati
 			return err
 		}
 
-		adminEmail := strings.ToLower(strings.TrimSpace(input.Admin.Email))
 		err := tx.Where("LOWER(email) = ?", adminEmail).First(&adminUser).Error
 		if err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -315,7 +335,7 @@ func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizati
 				ID:                 uuid.New(),
 				Email:              adminEmail,
 				PasswordHash:       string(hashedPass),
-				FullName:           strings.TrimSpace(input.Admin.FullName),
+				FullName:           adminFullName,
 				Phone:              input.Admin.Phone,
 				Status:             "ACTIVE",
 				MustChangePassword: true,
@@ -330,10 +350,39 @@ func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizati
 			OrganizationID: org.ID,
 			SchoolID:       school.ID,
 			UserID:         adminUser.ID,
+			MemberType:     "SCHOOL_ADMIN",
 			IsSchoolAdmin:  true,
 			Status:         "ACTIVE",
 		}
 		if err := tx.Create(&membership).Error; err != nil {
+			return err
+		}
+
+		// Onboarding Hook (SPEC-BE-TENANT-CORE mục 5):
+		// Khởi tạo vai trò hệ thống SCHOOL_ADMIN, gán quyền lõi (CORE_IAM, CORE_ORG, CORE_ACADEMIC) và gắn cho admin đầu tiên
+		schoolAdminRoleID := uuid.New()
+		if err := tx.Exec(`
+			INSERT INTO roles (id, organization_id, school_id, code, name, description, data_scope, is_system)
+			VALUES (?, ?, NULL, 'SCHOOL_ADMIN', 'Quản trị viên Trường', 'Vai trò quản trị mặc định của Đơn vị/Trường học', 'ORGANIZATION', TRUE)
+		`, schoolAdminRoleID, org.ID).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec(`
+			INSERT INTO role_permissions (organization_id, role_id, permission_id)
+			SELECT ?, ?, p.id
+			FROM permissions p
+			JOIN features f ON f.id = p.feature_id
+			WHERE p.is_active = TRUE
+			  AND UPPER(f.code) IN ('CORE_IAM', 'CORE_ORG', 'CORE_ACADEMIC')
+			ON CONFLICT DO NOTHING
+		`, org.ID, schoolAdminRoleID).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec(`
+			INSERT INTO user_roles (organization_id, membership_id, role_id, assigned_by)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT DO NOTHING
+		`, org.ID, membership.ID, schoolAdminRoleID, input.ActorID).Error; err != nil {
 			return err
 		}
 
@@ -369,11 +418,19 @@ func (s *Service) CreateOrganization(ctx context.Context, input CreateOrganizati
 	// Đẩy job cấp phát CNAME lên Cloudflare bất đồng bộ
 	s.provisioner.EnqueueProvision(org.ID)
 
-	return map[string]any{
+	res := map[string]any{
 		"organization": org,
 		"school":       school,
 		"school_admin": adminUser,
-	}, nil
+	}
+	if usedDefaultPassword {
+		res["default_admin_credentials"] = map[string]any{
+			"email":                adminEmail,
+			"password":             adminPassword,
+			"must_change_password": true,
+		}
+	}
+	return res, nil
 }
 
 func (s *Service) ApproveOrganization(ctx context.Context, orgID, actorID uuid.UUID, ip, ua string) (*Organization, error) {

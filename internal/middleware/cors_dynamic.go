@@ -55,7 +55,7 @@ func DynamicCORS() fiber.Handler {
 			return false
 		},
 		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-		AllowHeaders:     "Origin, Content-Type, Accept, Accept-Language, Authorization, X-Tenant-Subdomain, X-Request-ID, X-Requested-With",
+		AllowHeaders:     "Origin, Content-Type, Accept, Accept-Language, Authorization, X-Tenant-Subdomain, X-School-ID, X-Request-ID, X-Requested-With",
 		AllowCredentials: true,
 	})
 }
