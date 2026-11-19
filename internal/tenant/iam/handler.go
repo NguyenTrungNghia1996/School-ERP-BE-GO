@@ -34,7 +34,7 @@ func getActorUUID(c *fiber.Ctx) uuid.UUID {
 // @Tags Tenant IAM
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param X-School-ID header string false "School ID đang chọn"
 // @Param search query string false "Tìm kiếm"
 // @Param status query string false "Trạng thái (ACTIVE, SUSPENDED, INACTIVE)"
@@ -68,7 +68,7 @@ func (h *Handler) ListMembers(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param X-School-ID header string false "School ID đang chọn"
 // @Param body body CreateMemberInput true "Thông tin thành viên"
 // @Success 201 {object} response.SuccessResponse{data=SchoolMembership}
@@ -108,7 +108,7 @@ func (h *Handler) CreateMember(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param membership_id path string true "Membership ID"
 // @Param body body UpdateMemberRolesInput true "Danh sách role_ids"
 // @Success 200 {object} response.SuccessResponse
@@ -150,7 +150,7 @@ func (h *Handler) UpdateMemberRoles(c *fiber.Ctx) error {
 // @Tags Tenant IAM
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Success 200 {object} response.SuccessResponse{data=[]EntitledPermissionItem}
 // @Failure 403 {object} response.ErrorResponse
 // @Router /v1/iam/entitled-permissions [get]
@@ -173,7 +173,7 @@ func (h *Handler) ListEntitledPermissions(c *fiber.Ctx) error {
 // @Tags Tenant IAM
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Success 200 {object} response.SuccessResponse{data=[]TenantRole}
 // @Failure 403 {object} response.ErrorResponse
 // @Router /v1/iam/roles [get]
@@ -195,7 +195,7 @@ func (h *Handler) ListRoles(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param body body CreateRoleInput true "Thông tin vai trò"
 // @Success 201 {object} response.SuccessResponse{data=TenantRole}
 // @Failure 400 {object} response.ErrorResponse
@@ -234,7 +234,7 @@ func (h *Handler) CreateRole(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param id path string true "Role ID"
 // @Param body body UpdateRoleInput true "Thông tin cập nhật vai trò"
 // @Success 200 {object} response.SuccessResponse{data=TenantRole}
@@ -278,7 +278,7 @@ func (h *Handler) UpdateRole(c *fiber.Ctx) error {
 // @Tags Tenant IAM
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param id path string true "Role ID"
 // @Success 200 {object} response.SuccessResponse
 // @Failure 400 {object} response.ErrorResponse
@@ -318,7 +318,7 @@ func (h *Handler) DeleteRole(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param X-Tenant-Subdomain header string true "Subdomain của Đơn vị"
+// @Param X-Tenant-Subdomain header string false "Subdomain của Đơn vị (tùy chọn, mặc định tự lấy org_id từ JWT)"
 // @Param membership_id path string true "Membership ID"
 // @Param body body UpdateMemberStatusInput true "status, reason"
 // @Success 200 {object} response.SuccessResponse

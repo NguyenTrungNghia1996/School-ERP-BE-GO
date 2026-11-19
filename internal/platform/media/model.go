@@ -34,6 +34,8 @@ type StoredFile struct {
 	AccessURL       string         `json:"access_url,omitempty" gorm:"-"`
 	CreatedAt       time.Time      `json:"created_at" gorm:"column:created_at"`
 	DeletedAt       gorm.DeletedAt `json:"-" gorm:"column:deleted_at;index"`
+	TrashedAt       *time.Time     `json:"deleted_at,omitempty" gorm:"-"`
+	PurgedAt        *time.Time     `json:"purged_at,omitempty" gorm:"column:purged_at"`
 }
 
 func (StoredFile) TableName() string {
@@ -55,4 +57,8 @@ type MediaFileURLOutput struct {
 	ObjectKey string    `json:"object_key"`
 	URL       string    `json:"url"`
 	ExpiresIn int       `json:"expires_in_seconds,omitempty"`
+}
+
+type DeleteByURLInput struct {
+	AccessURL string `json:"access_url" example:"https://cdn.nghia196.qzz.io/orgs/7f284a1b-bec8-41d4-9ed6-f6de5252ff06/logos/2026/11/550e8400-e29b-41d4-a716-446655440000.png"`
 }

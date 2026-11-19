@@ -5,8 +5,10 @@ import (
 	"school-erp/internal/middleware"
 	"school-erp/internal/platform/audit"
 	"school-erp/internal/platform/billing"
+	platformmedia "school-erp/internal/platform/media"
 	tenantauth "school-erp/internal/tenant/auth"
 	tenantiam "school-erp/internal/tenant/iam"
+	tenantmedia "school-erp/internal/tenant/media"
 	tenantmenu "school-erp/internal/tenant/menu"
 	"school-erp/internal/tenant/org_school"
 
@@ -31,6 +33,9 @@ func RegisterRoutes(api fiber.Router) {
 
 	iamSvc := tenantiam.NewService(db, rdb, billingSvc, auditSvc)
 	iamHandler := tenantiam.NewHandler(iamSvc)
+
+	mediaSvc := platformmedia.NewService(db, config.StorageClient, billingSvc, auditSvc)
+	mediaHandler := tenantmedia.NewHandler(mediaSvc)
 
 	v1 := api.Group("/v1")
 
@@ -70,4 +75,15 @@ func RegisterRoutes(api fiber.Router) {
 	t.Put("/menus/customize", middleware.RequireTenantAccess(billingSvc, "CORE_ORG", "org:menu:manage"), menuHandler.CustomizeMenus)
 	t.Post("/menus/custom-items", middleware.RequireTenantAccess(billingSvc, "CORE_ORG", "org:menu:manage"), menuHandler.CreateCustomItem)
 	t.Delete("/menus/custom-items/:id", middleware.RequireTenantAccess(billingSvc, "CORE_ORG", "org:menu:manage"), menuHandler.DeleteCustomItem)
+
+	// Nhóm 5: Lưu trữ ảnh/tài liệu S3 / Cloudflare R2 & Dung lượng của Đơn vị / Trường học
+	t.Get("/storage/usage", middleware.RequireTenantAccess(billingSvc, "CORE_ORG", "org:media:read"), mediaHandler.GetUsage)
+	t.Get("/media", middleware.RequireTenantAccess(billingSvc, "CORE_ORG", "org:media:read"), mediaHandler.ListFiles)
+	t.Get("/media/trash", middleware.RequireTenantAccess(billingSvc, "CORE_ORG", "org:media:read"), mediaHandler.ListTrash)
+	t.Get("/media/:file_id/url", mediaHandler.GetFileURL)
+	t.Post("/media/upload", middleware.RequireTenantAccess(billingSvc, "CORE_ORG", "org:media:manage"), mediaHandler.UploadImage)
+	t.Post("/media/:file_id/restore", middleware.RequireTenantAccess(billingSvc, "CORE_ORG", "org:media:manage"), mediaHandler.RestoreFile)
+	t.Delete("/media/by-url", middleware.RequireTenantAccess(billingSvc, "CORE_ORG", "org:media:manage"), mediaHandler.DeleteFileByURL)
+	t.Delete("/media/:file_id/permanent", middleware.RequireTenantAccess(billingSvc, "CORE_ORG", "org:media:manage"), mediaHandler.PurgeFile)
+	t.Delete("/media/:file_id", middleware.RequireTenantAccess(billingSvc, "CORE_ORG", "org:media:manage"), mediaHandler.DeleteFile)
 }

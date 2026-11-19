@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"school-erp/config"
 	_ "school-erp/docs"
+	platformmedia "school-erp/internal/platform/media"
 	"school-erp/middleware"
 	"school-erp/routes"
 	"school-erp/seed"
@@ -31,7 +33,11 @@ func main() {
 		log.Printf("⚠️ Lỗi chạy seed dữ liệu: %v\n", err)
 	}
 
-	app := fiber.New()
+	platformmedia.NewService(config.DB, config.StorageClient, nil, nil).StartTrashCleanupWorker(context.Background())
+
+	app := fiber.New(fiber.Config{
+		BodyLimit: 28 * 1024 * 1024, // 28 MB (hỗ trợ tệp ảnh/tài liệu tối đa 25 MB + overhead multipart)
+	})
 	middleware.Setup(app)
 	routes.Setup(app)
 

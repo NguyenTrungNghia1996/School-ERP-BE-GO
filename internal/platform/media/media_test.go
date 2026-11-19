@@ -1,6 +1,8 @@
 package media_test
 
 import (
+	"archive/zip"
+	"bytes"
 	"school-erp/internal/platform/media"
 	"strings"
 	"testing"
@@ -41,5 +43,93 @@ func TestTenantFolderIsolationAndImageValidation(t *testing.T) {
 	mime, ext, err := media.ValidateImagePayload(pngHeader)
 	if err != nil || mime != "image/png" || ext != ".png" {
 		t.Fatalf("expected image/png (.png), got %s (%s), err=%v", mime, ext, err)
+	}
+}
+
+func buildTestZip(t *testing.T, entries []string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, name := range entries {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatalf("zip create %s: %v", name, err)
+		}
+		if _, err := w.Write([]byte("<xml/>")); err != nil {
+			t.Fatalf("zip write %s: %v", name, err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("zip close: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func TestDocumentValidation(t *testing.T) {
+	// PDF
+	mime, ext, err := media.ValidateFilePayload([]byte("%PDF-1.7\n1 0 obj\n<<>>\nendobj"), "report.pdf")
+	if err != nil || mime != "application/pdf" || ext != ".pdf" {
+		t.Fatalf("PDF failed: mime=%s ext=%s err=%v", mime, ext, err)
+	}
+
+	// DOCX
+	docxBytes := buildTestZip(t, []string{"[Content_Types].xml", "word/document.xml"})
+	mime, ext, err = media.ValidateFilePayload(docxBytes, "lesson.docx")
+	if err != nil || mime != "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || ext != ".docx" {
+		t.Fatalf("DOCX failed: mime=%s ext=%s err=%v", mime, ext, err)
+	}
+
+	// XLSX
+	xlsxBytes := buildTestZip(t, []string{"[Content_Types].xml", "xl/workbook.xml"})
+	mime, ext, err = media.ValidateFilePayload(xlsxBytes, "grades.xlsx")
+	if err != nil || mime != "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || ext != ".xlsx" {
+		t.Fatalf("XLSX failed: mime=%s ext=%s err=%v", mime, ext, err)
+	}
+
+	// Arbitrary ZIP disguised as .docx MUST be rejected
+	fakeZip := buildTestZip(t, []string{"malware.exe"})
+	if _, _, err := media.ValidateFilePayload(fakeZip, "fake.docx"); err != media.ErrInvalidFileType {
+		t.Fatalf("expected ErrInvalidFileType for arbitrary zip, got %v", err)
+	}
+
+	// Legacy DOC & XLS (OLE2 header)
+	ole2 := []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0x00, 0x00}
+	mime, ext, err = media.ValidateFilePayload(ole2, "old.doc")
+	if err != nil || mime != "application/msword" || ext != ".doc" {
+		t.Fatalf("DOC failed: mime=%s ext=%s err=%v", mime, ext, err)
+	}
+	mime, ext, err = media.ValidateFilePayload(ole2, "old.xls")
+	if err != nil || mime != "application/vnd.ms-excel" || ext != ".xls" {
+		t.Fatalf("XLS failed: mime=%s ext=%s err=%v", mime, ext, err)
+	}
+	if _, _, err := media.ValidateFilePayload(ole2, "unknown.bin"); err != media.ErrInvalidFileType {
+		t.Fatalf("expected ErrInvalidFileType for unknown OLE2 ext, got %v", err)
+	}
+}
+
+func TestExtractObjectKeyFromAccessURL(t *testing.T) {
+	want := "orgs/7f284a1b-bec8-41d4-9ed6-f6de5252ff06/logos/2026/11/550e8400-e29b-41d4-a716-446655440000.png"
+	validCases := []string{
+		"https://cdn.nghia196.qzz.io/" + want,
+		"cdn.nghia196.qzz.io/" + want,
+		"https://acc.r2.cloudflarestorage.com/image/" + want + "?X-Amz-Expires=900&X-Amz-Signature=abc",
+		want,
+	}
+	for _, raw := range validCases {
+		got, err := media.ExtractObjectKeyFromAccessURL(raw)
+		if err != nil || got != want {
+			t.Fatalf("ExtractObjectKeyFromAccessURL(%q) = (%q, %v), want %q", raw, got, err, want)
+		}
+	}
+
+	invalidCases := []string{
+		"",
+		"https://cdn.nghia196.qzz.io/other/file.png",
+		"https://cdn.nghia196.qzz.io/orgs/1111/../2222/secret.png",
+	}
+	for _, raw := range invalidCases {
+		if got, err := media.ExtractObjectKeyFromAccessURL(raw); err != media.ErrInvalidAccessURL {
+			t.Fatalf("expected ErrInvalidAccessURL for %q, got (%q, %v)", raw, got, err)
+		}
 	}
 }
