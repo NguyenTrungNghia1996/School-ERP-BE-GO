@@ -1,7 +1,7 @@
 # SCHOOL ERP SAAS — BỘ KHUNG QUẢN LÝ TÀI LIỆU DỰ ÁN
 
-**Phiên bản:** 1.1  
-**Trạng thái:** Baseline cập nhật; các quyết định gói dịch vụ, RBAC và menu động đã được người dùng xác nhận ngày 2026-11-13; chi tiết triển khai tiếp tục đặc tả  
+**Phiên bản:** 1.3  
+**Trạng thái:** Baseline cập nhật; bổ sung tách biệt định danh/phân quyền Platform Admin và kiến trúc API tập trung; chi tiết triển khai tiếp tục đặc tả  
 **Ngôn ngữ:** Tiếng Việt  
 **Công nghệ định hướng:** Go, Fiber, GORM, PostgreSQL
 
@@ -19,7 +19,7 @@ Tài liệu này là mục lục chuẩn và nguồn tham chiếu ban đầu cho
 - Kiến trúc khởi đầu: Modular Monolith, tách module theo bounded context; chưa chia microservices khi chưa có nhu cầu vận hành rõ ràng.
 - API: REST, đặc tả OpenAPI.
 - Hạ tầng định hướng: Docker; Redis cho cache/session/queue phù hợp; RabbitMQ cho xử lý bất đồng bộ khi cần; S3/MinIO cho tệp.
-- Tài khoản: single account identity; quyền truy cập được xác định qua membership, role, permission và data scope.
+- Tài khoản & Định danh: **Dual-Identity Architecture** — tách biệt hoàn toàn cụm tài khoản/phân quyền cấp nền tảng (`platform_users`) và cụm tài khoản/phân quyền cấp khách hàng (`users`). Trong phạm vi Tenant, duy trì single account identity; quyền truy cập được xác định qua membership, role, permission và data scope.
 - Phạm vi cấp học: hỗ trợ nhiều cấp học, cấu hình theo Organization/School.
 
 ## 3. Mô hình Organization – School – User
@@ -34,27 +34,37 @@ Tài liệu này là mục lục chuẩn và nguồn tham chiếu ban đầu cho
 - Subdomain phải unique ở database. Lịch sử đổi subdomain và danh sách subdomain bị giữ chỗ cần được quản lý.
 - Không cho đổi subdomain tùy tiện; thay đổi cần quy trình phê duyệt, audit và chính sách redirect.
 
-### 3.2 Định tuyến tên miền tham khảo
+### 3.2 Định tuyến tên miền tham khảo & API tập trung
 
 - `school-erp.vn`: website/đăng ký.
 - `app.school-erp.vn`: đăng nhập chung.
-- `admin.school-erp.vn`: cổng Super Admin.
+- `admin.school-erp.vn`: cổng Platform Admin (Super Admin).
 - `{subdomain}.school-erp.vn`: cổng Organization.
-- `api.school-erp.vn`: API.
+- `api.school-erp.vn`: API tập trung cho toàn bộ các cổng Frontend.
 
-Cần hỗ trợ wildcard DNS/TLS. Tenant resolver xác định Organization từ Host đã được reverse proxy xác thực. Không tin `organization_id` do frontend tự gửi hoặc header tùy ý. Nếu dùng API domain chung, tenant context phải được xác minh với Host, token và membership.
+Nguyên tắc định tuyến và xác minh ngữ cảnh khi Backend chạy tập trung tại `api.school-erp.vn`:
+- Hỗ trợ wildcard DNS/TLS và cấu hình Dynamic CORS chặt chẽ cho các subdomain hợp lệ thuộc `*.school-erp.vn`.
+- Tách biệt namespace API và Token Realm:
+  - Nhóm `/api/v1/platform/*`: phục vụ cổng `admin.school-erp.vn`, yêu cầu token thuộc realm `platform` (xác thực từ `platform_users`).
+  - Nhóm `/api/v1/*`: phục vụ cổng Tenant, yêu cầu token thuộc realm `tenant` (xác thực từ `users`) hoặc realm `support`.
+- Không tin `organization_id` hoặc header `X-Tenant-Subdomain` do frontend tự gửi một cách độc lập. Header/subdomain chỉ dùng làm tham số tra cứu (hint) và **bắt buộc phải được đối chiếu chéo** với JWT token và membership hợp lệ của người dùng trước khi thiết lập tenant context.
 
-### 3.3 Vai trò người dùng
+### 3.3 Phân tách định danh Platform và Vai trò người dùng
 
-Các nhóm chính:
-1. Super Admin cấp nền tảng.
-2. Admin trường.
-3. Giáo viên.
-4. Công chức/nhân viên trường (phân thành role nghiệp vụ cụ thể, không cấp một role STAFF quá rộng).
-5. Học sinh/sinh viên.
-6. Gia đình/phụ huynh/người giám hộ.
+#### A. Cụm quản trị nền tảng (Platform Realm)
+- Tách biệt hoàn toàn về bảng dữ liệu, luồng đăng nhập, danh mục chức năng và RBAC so với dữ liệu của các trường học.
+- Bao gồm đội ngũ vận hành SaaS (Root Super Admin, Quản lý gói/kinh doanh, Kỹ thuật viên hỗ trợ CSKH).
+- Dữ liệu thuộc cụm Platform mang tính toàn cục (global), không áp dụng PostgreSQL Row Level Security (RLS) cô lập theo tenant.
 
-`users` là danh tính đăng nhập duy nhất. Không dùng `account_type` làm cơ chế phân quyền. Quyền thực tế đến từ membership, roles, permissions và data scope.
+#### B. Cụm người dùng Tenant (Tenant Realm)
+Các nhóm chính trong phạm vi Organization/School:
+1. Admin trường.
+2. Giáo viên.
+3. Công chức/nhân viên trường (phân thành role nghiệp vụ cụ thể, không cấp một role STAFF quá rộng).
+4. Học sinh/sinh viên.
+5. Gia đình/phụ huynh/người giám hộ.
+
+`users` là danh tính đăng nhập duy nhất cho toàn bộ người dùng thuộc các Organization. Không dùng `account_type` làm cơ chế phân quyền. Quyền thực tế đến từ membership, roles, permissions và data scope.
 
 - `school_memberships`: liên kết user với school, có unique `(school_id, user_id)`.
 - Một user có thể có nhiều role trong cùng một trường.
@@ -63,25 +73,25 @@ Các nhóm chính:
 - Một phụ huynh có thể có nhiều con. Không tự động mở quyền giữa các Organization khác nhau.
 - Theo baseline Single, Admin trường/giáo viên/nhân viên mặc định gắn với một trường; nếu nghiệp vụ cần nhiều trường thì phải mở rộng membership có chủ đích.
 
-### 3.4 Super Admin truy cập vào trường
+### 3.4 Platform Admin truy cập vào trường (Support Mode)
 
-Super Admin là tài khoản cấp nền tảng, có thể quản trị Organization/School và hỗ trợ trực tiếp tại từng trường thông qua **Support Mode / Delegated Support Session**.
+Nhân sự vận hành nền tảng (`platform_users`) có quyền hỗ trợ trực tiếp tại từng trường thông qua **Support Mode / Delegated Support Session**.
 
 Nguyên tắc:
 - Không giả mạo tài khoản hoặc mật khẩu School Admin.
-- Không sửa role trong DB để giả lập người dùng.
-- Phiên hỗ trợ gắn actor, Organization, School, lý do, quyền được cấp, thời hạn và người phê duyệt nếu cần.
-- Có thể giới hạn read-only hoặc cấp quyền thao tác được duyệt.
-- Hiển thị banner Support Mode.
-- Ghi audit đầy đủ; hết hạn hoặc revoke phải vô hiệu ngay.
+- Không sửa role trong DB hoặc tạo bản ghi giả trong bảng `users` / `school_memberships` của trường.
+- Phiên hỗ trợ gắn tác nhân nền tảng, Organization, School, lý do, quyền được cấp, thời hạn và người phê duyệt nếu cần.
+- Cấp token tạm thời thuộc realm `support` với thời hạn ngắn; có thể giới hạn read-only hoặc cấp quyền thao tác được duyệt.
+- Hiển thị banner Support Mode trên giao diện.
+- Ghi audit đầy đủ (phân biệt rõ `actor_type = PLATFORM`); hết hạn hoặc revoke phải vô hiệu ngay.
 
-Bảng tham khảo `support_access_sessions`: actor_user_id, organization_id, school_id, session_type, reason, permissions JSONB, approved_by, started_at, expires_at, revoked_at.
+Bảng tham khảo `support_access_sessions`: `actor_platform_user_id` (FK trỏ tới `platform_users.id`), `organization_id`, `school_id`, `session_type`, `reason`, `permissions` JSONB, `approved_by` (FK trỏ tới `platform_users.id`), `started_at`, `expires_at`, `revoked_at`.
 
 ## 4. Nguyên tắc an toàn dữ liệu đa tenant
 
 - Mọi dữ liệu tenant-scoped phải mang `organization_id`; dữ liệu thuộc trường phải mang thêm `school_id` khi phù hợp.
 - Dùng composite foreign keys để ngăn liên kết chéo Organization/School, không chỉ dựa vào kiểm tra ở tầng ứng dụng.
-- PostgreSQL Row Level Security (RLS) là lớp phòng vệ bổ sung.
+- PostgreSQL Row Level Security (RLS) là lớp phòng vệ bổ sung cho toàn bộ bảng tenant-scoped.
 - Bật `FORCE ROW LEVEL SECURITY` cho bảng phù hợp; DB application role không phải superuser và không có `BYPASSRLS`.
 - Khi dùng connection pool, đặt tenant context trong transaction bằng `SET LOCAL`, không dùng `SET` toàn connection.
 - GORM phải thực hiện `SET LOCAL app.organization_id` và `app.school_id` trong cùng transaction/connection trước các truy vấn tenant-scoped.
@@ -94,16 +104,16 @@ Bảng tham khảo `support_access_sessions`: actor_user_id, organization_id, sc
 Mục tiêu, đối tượng, phạm vi sản phẩm, glossary, nguyên tắc kiến trúc, quyết định đã chốt, decision log, roadmap, phụ thuộc giữa gói.
 
 ### PK01 — Kiến trúc tổng thể
-C4 context/container/component, module boundaries, luồng request, tenant middleware, transaction strategy, logging, cache, event, background jobs, ADR.
+C4 context/container/component, module boundaries, luồng request qua API tập trung (`api.school-erp.vn`), Dynamic CORS, tách biệt realm middleware (`platform` vs `tenant` vs `support`), transaction strategy, logging, cache, event, background jobs, ADR.
 
 ### PK02 — Đa tổ chức & đa trường
 Organization lifecycle, đăng ký/duyệt/kích hoạt, subdomain lifecycle, School lifecycle, tenant resolver, custom domain nếu có, tenant isolation, Support Mode.
 
 ### PK03 — Tài khoản & phân quyền
-Authentication, SSO/MFA nếu cần, user lifecycle, membership, RBAC, permission catalog, data scope, guardian/student identity, session và token. Bổ sung: Organization tự tạo Role; Role chỉ được gán Permission thuộc Feature entitlement; User có thể có nhiều Role; phiên bản đầu không cấp quyền trực tiếp cho từng User; hỗ trợ Role hệ thống và Role tùy chỉnh theo phạm vi.
+Dual-identity authentication (`platform_users` và `users`), SSO/MFA, user lifecycle, Platform RBAC, Tenant membership & custom RBAC, permission catalog, data scope, guardian/student identity, session và token. Bổ sung: Organization tự tạo Role; Role chỉ được gán Permission thuộc Feature entitlement; User có thể có nhiều Role; phiên bản đầu không cấp quyền trực tiếp cho từng User; hỗ trợ Role hệ thống và Role tùy chỉnh theo phạm vi.
 
 ### PK04 — Cơ sở dữ liệu
-ERD tổng thể, naming convention, UUID, schema theo module, constraints, composite FK, index, soft delete, migration, RLS policies, seed data. Bổ sung nhóm bảng gói dịch vụ/entitlement, Feature/Menu, RBAC, Organization menu customization; thiết kế phiên bản gói và subscription chính + Add-on; ràng buộc tenant, audit và hiệu lực.
+ERD tổng thể, naming convention, UUID, schema theo module, constraints, composite FK, index, soft delete, migration, RLS policies, seed data. Bao gồm cả cụm bảng Platform Admin tách riêng (`platform_users`, `platform_roles`, `platform_permissions`, `platform_role_permissions`, `platform_user_roles`, `platform_menus`) và cụm bảng gói dịch vụ/entitlement, Feature/Menu, Tenant RBAC, Organization menu customization.
 
 ### PK05 — Nghiệp vụ đào tạo
 Cấp học, năm học, học kỳ, khối, lớp, môn học, chương trình, phân công giảng dạy, thời khóa biểu, lịch học và quy tắc chuyển lớp.
@@ -118,16 +128,16 @@ Cơ cấu tổ chức, phòng ban, chức vụ, hồ sơ giáo viên/nhân viên
 Điểm danh, đánh giá/điểm, học bạ, tài chính/học phí, thu chi, thư viện, y tế, tuyển sinh, văn thư, tài sản, tư vấn và báo cáo nghiệp vụ. Mỗi phân hệ cần đặc tả độc lập bên trong gói.
 
 ### PK09 — API & tích hợp
-API conventions, versioning, OpenAPI, error model, pagination/filter/sort, idempotency, webhook, notification, payment gateway, import/export và tích hợp bên thứ ba. Bổ sung API quản lý Package/Subscription/Add-on, Feature entitlement, Role/Permission, menu nền và menu tùy chỉnh; middleware/authorization policy kiểm tra subscription, feature, permission và data scope.
+API conventions, versioning, OpenAPI, error model, pagination/filter/sort, idempotency, webhook, notification, payment gateway, import/export và tích hợp bên thứ ba. Tách namespace `/api/v1/platform/*` và `/api/v1/*`; API quản lý Platform RBAC/Menu, Package/Subscription/Add-on, Feature entitlement, Tenant Role/Permission, menu nền và menu tùy chỉnh.
 
 ### PK10 — Giao diện & ứng dụng
-Design system, responsive web, Platform Admin, School Admin, Teacher Portal, Staff Portal, Student Portal, Family Portal, mobile app, navigation và accessibility. Bổ sung màn hình quản lý Feature/Package/Subscription cho Super Admin; quản lý Role/Permission và menu cho Organization; menu động kết hợp menu nền với menu riêng của Organization, chỉ hiển thị theo entitlement và quyền của tài khoản.
+Design system, responsive web, Platform Admin (`admin.school-erp.vn`), School Admin, Teacher Portal, Staff Portal, Student Portal, Family Portal, mobile app, navigation và accessibility. Bổ sung màn hình quản lý nhân sự/phân quyền nội bộ Platform, Feature/Package/Subscription cho Platform Admin; quản lý Role/Permission và menu cho Organization.
 
 ### PK11 — Hạ tầng, bảo mật & vận hành
-Môi trường dev/staging/production, Docker, CI/CD, secrets, TLS, WAF/rate limit, backup/restore, disaster recovery, observability, audit, retention, privacy và incident response.
+Môi trường dev/staging/production, Docker, CI/CD, secrets, TLS, WAF/rate limit, backup/restore, disaster recovery, observability, audit (`actor_type`), retention, privacy và incident response.
 
 ### PK12 — Kiểm thử & triển khai
-Test strategy, unit/integration/e2e, RLS/tenant isolation tests, performance/load tests, UAT, acceptance criteria, migration/seed, rollout/rollback, training, 16-sprint roadmap và release checklist.
+Test strategy, unit/integration/e2e, RLS/tenant isolation tests, cross-realm token isolation tests, performance/load tests, UAT, acceptance criteria, migration/seed, rollout/rollback, training, 16-sprint roadmap và release checklist.
 
 ## 6. Quy tắc làm việc trong từng chat gói
 
@@ -157,8 +167,9 @@ Không ghi đè quyết định cũ mà không có change note. Khi một thay �
 - Baseline Organization → nhiều School: đã xác định.
 - Organization có một subdomain: đã xác định.
 - Shared database/shared schema: đã xác định.
-- Single account identity: đã xác định.
-- Super Admin Support Mode: đã xác định về nguyên tắc, cần đặc tả chi tiết.
+- Dual-Identity (tách biệt `platform_users` và `users`): đã xác định.
+- API tập trung tại `api.school-erp.vn` phục vụ đa subdomain FE: đã xác định.
+- Platform Admin Support Mode: đã xác định về nguyên tắc, cần đặc tả chi tiết.
 - Modular Monolith: định hướng đã xác định.
 - Chi tiết ERD, permission catalog, API, UI, nghiệp vụ từng phân hệ: chưa hoàn tất, cần phát triển trong các gói tương ứng.
 
@@ -176,14 +187,15 @@ Nếu thiếu dữ kiện, ghi `OPEN QUESTION` thay vì tự suy đoán thành q
 
 **Ngày xác nhận:** 2026-11-13  
 **Trạng thái:** Accepted về định hướng kiến trúc; chi tiết kỹ thuật đang được đặc tả.  
-**Phạm vi ảnh hưởng:** PK02, PK03, PK04, PK09, PK10, PK11, PK12.
+**Phạm vi ảnh hưởng:** PK01, PK02, PK03, PK04, PK09, PK10, PK11, PK12.
 
 ### 10.1. Quyết định đã xác nhận
 
 1. **Gói dịch vụ:** Mỗi Organization có một gói chính và có thể có nhiều gói chức năng bổ sung (Add-on). Entitlement của Organization là hợp nhất các Feature được cấp từ gói chính và các Add-on còn hiệu lực.
 2. **Role:** Organization được tự tạo Role tùy chỉnh. Permission được gán cho Role phải nằm trong phạm vi Feature entitlement mà Organization được sử dụng.
 3. **Quyền User:** Phiên bản đầu tiên không cấp permission trực tiếp cho từng User. Quyền hiệu lực đến từ một hoặc nhiều Role được gán cho User thông qua membership.
-4. **Menu:** Super Admin định nghĩa menu nền. Organization được tùy chỉnh menu nền và tạo menu riêng. Menu riêng chỉ được trỏ đến route/feature hợp lệ mà Organization được cấp; menu không thay thế kiểm tra authorization ở backend.
+4. **Menu:** Platform Admin định nghĩa menu nền cho Tenant. Organization được tùy chỉnh menu nền và tạo menu riêng. Menu riêng chỉ được trỏ đến route/feature hợp lệ mà Organization được cấp; menu không thay thế kiểm tra authorization ở backend.
+5. **Tách biệt quản trị nền tảng:** Platform Admin có hệ thống bảng người dùng, vai trò, quyền hạn và menu độc lập hoàn toàn với Tenant.
 
 ### 10.2. Nguyên tắc nghiệp vụ và bảo mật
 
@@ -195,24 +207,25 @@ Nếu thiếu dữ kiện, ghi `OPEN QUESTION` thay vì tự suy đoán thành q
 - Không cho phép menu tùy chỉnh vượt qua entitlement hoặc RBAC. Route/API phải được backend bảo vệ độc lập.
 - Khi subscription/add-on hết hạn, bị tạm ngưng hoặc thu hồi, entitlement tương ứng phải mất hiệu lực theo thời điểm hiệu lực đã quy định; cần invalidation cache và audit.
 - Gói đã được gán cần có chính sách versioning/snapshot để thay đổi catalog hoặc package template không âm thầm thay đổi quyền đã bán/cấp cho Organization.
-- Mọi thao tác tạo/sửa/gán/thu hồi package, subscription, feature, role, permission và menu phải có audit phù hợp.
+- Mọi thao tác tạo/sửa/gán/thu hồi package, subscription, feature, role, permission và menu phải có audit phù hợp (ghi nhận rõ `actor_type` là `PLATFORM` hay `TENANT`).
 
 ### 10.3. Danh sách yêu cầu (Requirement Register)
 
 | Mã yêu cầu | Nội dung | Ưu tiên | Gói chính | Gói liên quan |
 |---|---|---|---|---|
 | REQ-PK00-NEW-001 | Một Organization có một gói chính và nhiều Add-on | Must | PK02 | PK03, PK04, PK09, PK10 |
-| REQ-PK00-NEW-002 | Super Admin quản lý Feature Catalog và Permission Catalog | Must | PK03 | PK04, PK09, PK10 |
-| REQ-PK00-NEW-003 | Super Admin cấp/gia hạn/tạm ngưng/thu hồi gói chính và Add-on cho Organization | Must | PK02 | PK03, PK04, PK09, PK11 |
+| REQ-PK00-NEW-002 | Platform Admin quản lý Feature Catalog và Permission Catalog | Must | PK03 | PK04, PK09, PK10 |
+| REQ-PK00-NEW-003 | Platform Admin cấp/gia hạn/tạm ngưng/thu hồi gói chính và Add-on cho Organization | Must | PK02 | PK03, PK04, PK09, PK11 |
 | REQ-PK00-NEW-004 | Hợp nhất entitlement từ gói chính và Add-on còn hiệu lực | Must | PK03 | PK02, PK04, PK09 |
 | REQ-PK00-NEW-005 | Organization tạo Role tùy chỉnh và gán Permission được phép | Must | PK03 | PK04, PK09, PK10 |
 | REQ-PK00-NEW-006 | User nhận quyền thông qua một hoặc nhiều Role; không cấp quyền trực tiếp trong phiên bản đầu | Must | PK03 | PK04, PK09, PK10 |
-| REQ-PK00-NEW-007 | Super Admin quản lý menu nền; Organization tùy chỉnh và tạo menu riêng | Must | PK10 | PK03, PK04, PK09 |
+| REQ-PK00-NEW-007 | Platform Admin quản lý menu nền; Organization tùy chỉnh và tạo menu riêng | Must | PK10 | PK03, PK04, PK09 |
 | REQ-PK00-NEW-008 | Menu chỉ hiển thị khi Organization có entitlement và User có quyền phù hợp | Must | PK10 | PK03, PK09 |
 | REQ-PK00-NEW-009 | Backend authorization kiểm tra subscription, feature, permission và data scope | Must | PK03 | PK01, PK09, PK12 |
 | REQ-PK00-NEW-010 | Audit, cache invalidation và hiệu lực tức thời/đúng hạn khi thay đổi entitlement và RBAC | Must | PK11 | PK02, PK03, PK09, PK12 |
 | REQ-PK00-NEW-011 | Quản lý phiên bản package/catalog và chính sách áp dụng thay đổi cho subscription hiện hữu | Should | PK02 | PK03, PK04, PK11 |
 | REQ-PK00-NEW-012 | Cho phép Organization cấu hình thứ tự, nhãn, icon, nhóm và trạng thái hiển thị menu; menu riêng chỉ trỏ đến đích được đăng ký | Should | PK10 | PK03, PK04 |
+| REQ-PK00-NEW-013 | Tách biệt hoàn toàn bảng tài khoản, vai trò, quyền và menu cho Platform Admin khỏi Tenant | Must | PK03 | PK01, PK04, PK09, PK11, PK12 |
 
 ### 10.4. ADR đề xuất
 
@@ -236,11 +249,22 @@ Nếu thiếu dữ kiện, ghi `OPEN QUESTION` thay vì tự suy đoán thành q
 
 - **Trạng thái:** Accepted.
 - **Bối cảnh:** Nền tảng cần trải nghiệm điều hướng thống nhất nhưng từng Organization có thể sắp xếp và bổ sung lối vào nghiệp vụ riêng.
-- **Quyết định:** Super Admin quản lý menu nền; Organization có lớp cấu hình override (ẩn/hiện, thứ tự, nhãn/icon nếu được cho phép) và có thể tạo menu riêng. Mỗi menu item phải tham chiếu Feature/route/permission đã đăng ký; không cho menu tùy chỉnh tạo quyền truy cập mới.
+- **Quyết định:** Platform Admin quản lý menu nền; Organization có lớp cấu hình override (ẩn/hiện, thứ tự, nhãn/icon nếu được cho phép) và có thể tạo menu riêng. Mỗi menu item phải tham chiếu Feature/route/permission đã đăng ký; không cho menu tùy chỉnh tạo quyền truy cập mới.
 - **Hệ quả:** Cần menu catalog/version, organization menu configuration, validation route/feature, API trả menu đã được lọc theo entitlement và quyền User. Backend vẫn kiểm tra quyền tại endpoint.
 - **Vấn đề mở:** Phạm vi tùy chỉnh nhãn/icon; menu đa cấp; route registry; menu item trỏ đến external URL; quyền tạo menu riêng theo Role nào.
 
+#### ADR-004 — Tách biệt định danh & phân quyền Platform Admin và API tập trung
+
+- **Trạng thái:** Accepted.
+- **Bối cảnh:** Backend triển khai tập trung tại `api.school-erp.vn` phục vụ đồng thời cổng quản trị nền tảng (`admin.school-erp.vn`) và các cổng trường học (`{subdomain}.school-erp.vn`). Cần cô lập tuyệt đối đặc quyền quản trị nền tảng khỏi người dùng tenant.
+- **Quyết định:** Tách riêng cụm bảng `platform_users`, `platform_roles`, `platform_permissions`, `platform_role_permissions`, `platform_user_roles`, `platform_menus` khỏi bảng `users` và RBAC của Tenant. Tách namespace API (`/api/v1/platform/*` và `/api/v1/*`) cùng cơ chế xác thực JWT Realm (`platform`, `tenant`, `support`).
+- **Hệ quả:** Không có khóa ngoại chéo giữa bảng user nền tảng và bảng user trường học; `support_access_sessions` tham chiếu tới `platform_users`; Audit log phải lưu `actor_type`; cấu hình Dynamic CORS và xác minh chéo `X-Tenant-Subdomain` với token/membership.
+
 ### 10.5. Đồng bộ phạm vi theo gói
+
+**PK01 — Kiến trúc tổng thể**
+- Cấu hình Dynamic CORS trên `api.school-erp.vn` cho `admin.school-erp.vn` và `*.school-erp.vn`.
+- Tách biệt Middleware Auth theo Realm (`platform`, `tenant`, `support`), tenant context resolver, authorization policy và cache strategy.
 
 **PK02 — Đa tổ chức & đa trường**
 - Mô hình subscription của Organization: một gói chính + nhiều Add-on.
@@ -248,60 +272,62 @@ Nếu thiếu dữ kiện, ghi `OPEN QUESTION` thay vì tự suy đoán thành q
 - Quy tắc tenant ownership; Organization không tự nâng entitlement ngoài quyền mua/cấp.
 
 **PK03 — Tài khoản & phân quyền**
-- Feature entitlement là lớp kiểm tra trước RBAC.
-- Permission Catalog chuẩn `resource:action` (ví dụ `attendance:read`, `grade:input`, `fee:collect`).
+- Phân tách hoàn toàn Auth & RBAC giữa Platform (`platform_users`) và Tenant (`users`).
+- Feature entitlement là lớp kiểm tra trước Tenant RBAC.
+- Permission Catalog chuẩn `resource:action` (ví dụ `attendance:read`, `grade:input`, `fee:collect`) và Platform Permission chuẩn `platform:<resource>:<action>`.
 - Role hệ thống và Role tùy chỉnh theo Organization; user-role assignment qua membership.
 - Không có user-level permission override trong phiên bản đầu.
 - Data Scope là lớp giới hạn dữ liệu sau khi xác định permission.
 
 **PK04 — Cơ sở dữ liệu**
-- Đặc tả ERD, khóa ngoại, unique constraints, index, soft delete và audit cho package, package version, package feature, subscription, entitlement, feature, menu, role, permission, role-permission, user-role và scope.
-- Tenant-scoped tables phải mang `organization_id`/`school_id` phù hợp, có composite FK và RLS theo baseline.
+- Đặc tả ERD, khóa ngoại, unique constraints, index, soft delete và audit cho cụm bảng Platform (`platform_users`, `platform_roles`, `platform_permissions`, `platform_role_permissions`, `platform_user_roles`, `platform_menus`), package, package version, package feature, subscription, entitlement, feature, menu, tenant role, permission, role-permission, user-role và scope.
+- Tenant-scoped tables phải mang `organization_id`/`school_id` phù hợp, có composite FK và RLS theo baseline; các bảng Platform không bật tenant RLS.
 - Xác định snapshot/versioning để thay đổi package template không làm thay đổi âm thầm subscription đang hoạt động.
 
 **PK09 — API & tích hợp**
-- API quản trị package/catalog và subscription/add-on.
+- Tách namespace `/api/v1/platform/*` và `/api/v1/*`.
+- API quản trị nhân sự/phân quyền Platform, package/catalog và subscription/add-on.
 - API đọc entitlement hiệu lực của Organization.
-- API quản lý Role, Permission và assignment.
+- API quản lý Tenant Role, Permission và assignment.
 - API lấy menu đã lọc theo entitlement + RBAC; API quản lý menu customization.
 - Chuẩn lỗi 401/403/404; idempotency cho thao tác cấp/gia hạn/thu hồi; audit events; cache invalidation.
 
 **PK10 — Giao diện & ứng dụng**
-- Platform Admin: Feature Catalog, Permission Catalog, Package Builder, Package Assignment/Subscription Management, Menu Builder.
+- Platform Admin (`admin.school-erp.vn`): Quản lý tài khoản/vai trò/menu nội bộ Platform, Feature Catalog, Permission Catalog, Package Builder, Package Assignment/Subscription Management, Tenant Menu Builder.
 - Organization Admin: xem gói và entitlement, quản lý Role/Permission, cấu hình menu nền và menu riêng.
 - Ứng dụng người dùng: render menu động từ API; xử lý trạng thái không có quyền; không xem việc ẩn menu là biện pháp bảo mật.
-- Menu đa cấp, thứ tự, icon, nhãn và responsive navigation cần được đặc tả.
 
-**PK01/PK11/PK12 — Phụ thuộc liên quan**
-- PK01: authorization middleware/policy, tenant context, cache strategy.
-- PK11: audit log, bảo mật, cache invalidation, observability và vận hành subscription.
-- PK12: test entitlement, RBAC, data scope, menu filtering, tenant isolation, hết hạn/thu hồi và race conditions.
+**PK11/PK12 — Phụ thuộc liên quan**
+- PK11: audit log phân tách `actor_type`, bảo mật cross-origin/cookie, cache invalidation, observability và vận hành subscription.
+- PK12: test cross-realm isolation (không dùng token Tenant gọi API Platform và ngược lại), test entitlement, RBAC, data scope, menu filtering, tenant isolation, hết hạn/thu hồi và race conditions.
 
 ### 10.6. Mô hình dữ liệu định hướng (chưa phải ERD được duyệt)
 
 Các nhóm thực thể cần đặc tả trong PK04:
 
-- Catalog: `features`, `permissions`, `menus`, `menu_routes` (hoặc route registry tương đương), `feature_permissions`, `feature_menus`.
-- Package: `service_packages`, `service_package_versions`, `service_package_features`.
-- Subscription: `organization_subscriptions` hoặc `subscriptions`, `subscription_items` cho gói chính/Add-on, `subscription_entitlements` nếu cần snapshot/materialization.
-- RBAC: `roles`, `role_permissions`, `user_roles`, `role_scopes`.
-- Menu tenant: `organization_menu_items` hoặc `organization_menu_configs`.
-- Audit: dùng audit framework chung, lưu actor, tenant, action, before/after, reason và timestamp.
+- **Platform Admin (tách riêng):** `platform_users`, `platform_roles`, `platform_permissions`, `platform_role_permissions`, `platform_user_roles`, `platform_menus`, `support_access_sessions`.
+- **Catalog (Tenant):** `features`, `permissions`, `menus`, `menu_routes` (hoặc route registry tương đương), `feature_permissions`, `feature_menus`.
+- **Package:** `service_packages`, `service_package_versions`, `service_package_features`.
+- **Subscription:** `organization_subscriptions` hoặc `subscriptions`, `subscription_items` cho gói chính/Add-on, `subscription_entitlements` nếu cần snapshot/materialization.
+- **Tenant RBAC:** `roles`, `role_permissions`, `user_roles`, `role_scopes`.
+- **Menu tenant:** `organization_menu_items` hoặc `organization_menu_configs`.
+- **Audit:** dùng audit framework chung, lưu `actor_type` (`PLATFORM` | `TENANT`), `actor_id`, `tenant_id` (nullable với thao tác toàn cục), `action`, `before`/`after`, `reason` và `timestamp`.
 
 Tên bảng trên là tên định hướng để PK04 đánh giá; chưa chốt schema cuối cùng. `user_permission_overrides` không nằm trong phạm vi phiên bản đầu.
 
 ### 10.7. Tiêu chí nghiệm thu cấp dự án
 
-1. Super Admin tạo được gói chính và Add-on, khai báo Feature được bao gồm.
-2. Organization được cấp một gói chính và nhiều Add-on; hệ thống tính đúng entitlement đang hiệu lực.
-3. Organization không thể gán Role permission ngoài entitlement.
-4. User có nhiều Role và quyền hiệu lực được tổng hợp đúng; không tồn tại luồng cấp permission trực tiếp cho User trong phiên bản đầu.
-5. Organization có thể tùy chỉnh menu nền và tạo menu riêng trong giới hạn cho phép.
-6. Menu API không trả về mục không thuộc entitlement hoặc không có quyền phù hợp.
-7. Gọi trực tiếp API không có quyền vẫn bị backend từ chối, kể cả khi biết URL.
-8. Hết hạn/thu hồi Add-on làm mất quyền Feature tương ứng mà không ảnh hưởng Feature vẫn được cấp bởi gói chính hoặc Add-on khác.
-9. Mọi thay đổi quan trọng có audit và cache được làm mới theo chính sách.
-10. Kiểm thử tenant isolation chứng minh Organization không thể đọc/sửa subscription, Role, menu hoặc dữ liệu của Organization khác.
+1. Platform Admin đăng nhập độc lập bằng bảng `platform_users`, phân quyền và hiển thị menu quản trị nền tảng theo `platform_roles` / `platform_permissions`.
+2. Platform Admin tạo được gói chính và Add-on, khai báo Feature được bao gồm.
+3. Organization được cấp một gói chính và nhiều Add-on; hệ thống tính đúng entitlement đang hiệu lực.
+4. Organization không thể gán Role permission ngoài entitlement.
+5. User thuộc Organization có nhiều Role và quyền hiệu lực được tổng hợp đúng; không tồn tại luồng cấp permission trực tiếp cho User trong phiên bản đầu.
+6. Organization có thể tùy chỉnh menu nền và tạo menu riêng trong giới hạn cho phép.
+7. Menu API không trả về mục không thuộc entitlement hoặc không có quyền phù hợp.
+8. Gọi trực tiếp API không có quyền (hoặc dùng token sai realm/sai tenant) vẫn bị backend tại `api.school-erp.vn` từ chối.
+9. Hết hạn/thu hồi Add-on làm mất quyền Feature tương ứng mà không ảnh hưởng Feature vẫn được cấp bởi gói chính hoặc Add-on khác.
+10. Mọi thay đổi quan trọng có audit (đúng `actor_type`) và cache được làm mới theo chính sách.
+11. Kiểm thử tenant isolation chứng minh Organization không thể đọc/sửa subscription, Role, menu hoặc dữ liệu của Organization khác.
 
 ### 10.8. Open Questions cần xử lý ở các gói chuyên trách
 
@@ -318,25 +344,27 @@ Tên bảng trên là tên định hướng để PK04 đánh giá; chưa chốt
 | Phiên bản | Ngày | Thay đổi |
 |---|---|---|
 | 1.1 | 2026-11-13 | Ghi nhận 4 quyết định đã xác nhận; bổ sung REQ-PK00-NEW-001 đến 012; đề xuất ADR-001 đến ADR-003; đồng bộ phạm vi PK02/03/04/09/10 và phụ thuộc PK01/11/12. |
+| 1.2 | 2026-11-13 | Bổ sung mục 11 tiến độ đặc tả Service Package, RBAC & Dynamic Menu (v0.1 Draft) và danh sách 7 OPEN QUESTIONS ưu tiên. |
+| 1.3 | 2026-11-13 | Chuyển từ Single account identity sang **Dual-Identity Architecture**: tách biệt hoàn toàn bảng tài khoản, vai trò, quyền và menu cho Platform Admin (`platform_users`, `platform_roles`, `platform_permissions`, `platform_menus`) khỏi cụm Tenant (`users`). Cập nhật khóa ngoại `support_access_sessions` sang `actor_platform_user_id`, bổ sung kiến trúc API tập trung (`api.school-erp.vn`) phục vụ đa subdomain FE, thêm `REQ-PK00-NEW-013` và `ADR-004`. |
 
 
 ## 11. Tiến độ đặc tả Service Package, RBAC & Dynamic Menu
 
 **Ngày cập nhật:** 2026-11-13  
-**Trạng thái:** Các quyết định kiến trúc đã được xác nhận; đặc tả kỹ thuật v0.1 đang ở Draft for Review.
+**Trạng thái:** Các quyết định kiến trúc đã được xác nhận; đặc tả kỹ thuật v0.1 đang ở Draft for Review (cần đồng bộ v1.3 về tách bảng Platform Admin).
 
 ### 11.1. Các tài liệu đã khởi tạo
-- `PK03_TAI_KHOAN_VA_PHAN_QUYEN_v0.1.md`: entitlement-aware Custom RBAC.
-- `PK04_ERD_SERVICE_PACKAGE_RBAC_DYNAMIC_MENU_v0.1.md`: ERD, data dictionary, constraints, migration order.
-- `PK09_API_VA_TICH_HOP_v0.1.md`: API surface và authorization contract.
+- `PK03_TAI_KHOAN_VA_PHAN_QUYEN_v0.1.md`: entitlement-aware Custom RBAC (cần bổ sung phần Platform Auth & RBAC).
+- `PK04_ERD_SERVICE_PACKAGE_RBAC_DYNAMIC_MENU_v0.1.md`: ERD, data dictionary, constraints, migration order (cần bổ sung nhóm bảng `platform_*`).
+- `PK09_API_VA_TICH_HOP_v0.1.md`: API surface và authorization contract (cần đồng bộ tách namespace `/api/v1/platform/*` và cross-subdomain headers).
 - `PK10_GIAO_DIEN_VA_UNG_DUNG_v0.1.md`: UI scope cho Platform Admin, Organization Admin và end users.
 
 ### 11.2. Trạng thái
 | Gói | Trạng thái | Nội dung |
 |---|---|---|
-| PK03 | Draft v0.1 | Feature entitlement, Custom RBAC, Role assignment, Data Scope |
-| PK04 | Draft v0.1 | ERD và data dictionary cho package, subscription, RBAC, menu, audit |
-| PK09 | Draft v0.1 | API catalog và authorization pipeline |
+| PK03 | Draft v0.1 | Feature entitlement, Custom RBAC, Role assignment, Data Scope (+ cần cập nhật Dual-Identity) |
+| PK04 | Draft v0.1 | ERD và data dictionary cho package, subscription, RBAC, menu, audit (+ cần thêm `platform_*`) |
+| PK09 | Draft v0.1 | API catalog và authorization pipeline (+ cần đồng bộ API domain chung `api.school-erp.vn`) |
 | PK10 | Draft v0.1 | Package Builder, Role Management, Menu Builder, end-user navigation |
 
 ### 11.3. Quy tắc thực hiện tiếp
@@ -345,7 +373,7 @@ Tên bảng trên là tên định hướng để PK04 đánh giá; chưa chốt
 - Entitlement được tính từ subscription item và package version features; cache/projection không là nguồn sự thật.
 - Menu không là ranh giới bảo mật; backend kiểm tra authorization trên từng API/action.
 - Không cấp permission trực tiếp cho User trong MVP.
-- Các bảng tenant-scoped tuân thủ composite FK, RLS và `SET LOCAL` theo baseline mục 4.
+- Các bảng tenant-scoped tuân thủ composite FK, RLS và `SET LOCAL` theo baseline mục 4; các bảng `platform_*` không áp dụng RLS theo tenant.
 
 ### 11.4. OPEN QUESTIONS ưu tiên chốt
 1. Mô hình membership Organization/School và khóa ngoại của Role assignment.

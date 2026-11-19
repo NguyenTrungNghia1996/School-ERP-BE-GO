@@ -75,6 +75,7 @@ type SchoolMembership struct {
 	OrganizationID uuid.UUID `json:"organization_id" gorm:"column:organization_id;type:uuid;not null"`
 	SchoolID       uuid.UUID `json:"school_id" gorm:"column:school_id;type:uuid;not null"`
 	UserID         uuid.UUID `json:"user_id" gorm:"column:user_id;type:uuid;not null"`
+	MemberType     string    `json:"member_type" gorm:"column:member_type;type:varchar(30);not null;default:'STAFF'"`
 	IsSchoolAdmin  bool      `json:"is_school_admin" gorm:"column:is_school_admin;not null;default:false"`
 	Status         string    `json:"status" gorm:"column:status;type:varchar(20);not null;default:'ACTIVE'"`
 	CreatedAt      time.Time `json:"created_at" gorm:"column:created_at"`
