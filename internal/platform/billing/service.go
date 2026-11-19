@@ -16,6 +16,7 @@ import (
 
 var (
 	ErrPackageNotFound         = errors.New("service package not found")
+	ErrPackageInUse            = errors.New("service package already has published versions or subscriptions")
 	ErrPackageCodeTaken        = errors.New("service package code already exists")
 	ErrVersionNotFound         = errors.New("package version not found")
 	ErrPackageVersionImmutable = errors.New("published or deprecated package version is immutable")
@@ -165,6 +166,145 @@ func (s *Service) CreatePackage(ctx context.Context, input CreatePackageInput) (
 	}
 
 	return pkg, nil
+}
+
+type UpdatePackageInput struct {
+	Name        *string `json:"name" example:"Gói Tiêu chuẩn"`
+	Description *string `json:"description"`
+	IsPublic    *bool   `json:"is_public"`
+	IsActive    *bool   `json:"is_active"`
+}
+
+func (s *Service) UpdatePackage(ctx context.Context, pkgID uuid.UUID, input UpdatePackageInput, actorID uuid.UUID, ip, ua string) (*ServicePackage, error) {
+	var pkg ServicePackage
+	if err := s.db.WithContext(ctx).First(&pkg, "id = ?", pkgID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPackageNotFound
+		}
+		return nil, err
+	}
+
+	updates := map[string]any{"updated_at": time.Now()}
+	if input.Name != nil && strings.TrimSpace(*input.Name) != "" {
+		updates["name"] = strings.TrimSpace(*input.Name)
+	}
+	if input.Description != nil {
+		updates["description"] = input.Description
+	}
+	if input.IsPublic != nil {
+		updates["is_public"] = *input.IsPublic
+	}
+	if input.IsActive != nil {
+		updates["is_active"] = *input.IsActive
+	}
+
+	before := pkg
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&pkg).Updates(updates).Error; err != nil {
+			return err
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &actorID,
+			Action:       "SERVICE_PACKAGE_UPDATED",
+			ResourceType: "SERVICE_PACKAGE",
+			ResourceID:   &pkg.ID,
+			BeforeData:   before,
+			AfterData:    updates,
+			IPAddress:    ip,
+			UserAgent:    ua,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	_ = s.db.WithContext(ctx).Preload("Versions").First(&pkg, "id = ?", pkgID).Error
+	return &pkg, nil
+}
+
+func (s *Service) DeletePackage(ctx context.Context, pkgID, actorID uuid.UUID, ip, ua string) error {
+	var pkg ServicePackage
+	if err := s.db.WithContext(ctx).First(&pkg, "id = ?", pkgID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrPackageNotFound
+		}
+		return err
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var nonDraftCount, subCount int64
+		tx.Model(&ServicePackageVersion{}).Where("package_id = ? AND status <> 'DRAFT'", pkgID).Count(&nonDraftCount)
+		tx.Raw(`
+			SELECT COUNT(*) FROM organization_subscriptions os
+			JOIN service_package_versions spv ON spv.id = os.package_version_id
+			WHERE spv.package_id = ?
+		`, pkgID).Scan(&subCount)
+		if nonDraftCount > 0 || subCount > 0 {
+			return ErrPackageInUse
+		}
+
+		// Xóa các phiên bản DRAFT & feature mapping trước khi xóa gói
+		if err := tx.Exec(`
+			DELETE FROM service_package_features
+			WHERE package_version_id IN (SELECT id FROM service_package_versions WHERE package_id = ?)
+		`, pkgID).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("package_id = ?", pkgID).Delete(&ServicePackageVersion{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&pkg).Error; err != nil {
+			return err
+		}
+
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &actorID,
+			Action:       "SERVICE_PACKAGE_DELETED",
+			ResourceType: "SERVICE_PACKAGE",
+			ResourceID:   &pkg.ID,
+			BeforeData:   pkg,
+			IPAddress:    ip,
+			UserAgent:    ua,
+		})
+	})
+}
+
+func (s *Service) DeletePackageVersion(ctx context.Context, verID, actorID uuid.UUID, ip, ua string) error {
+	var ver ServicePackageVersion
+	if err := s.db.WithContext(ctx).First(&ver, "id = ?", verID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrVersionNotFound
+		}
+		return err
+	}
+	if ver.Status != "DRAFT" {
+		return ErrPackageVersionImmutable
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var subCount int64
+		tx.Model(&OrganizationSubscription{}).Where("package_version_id = ?", verID).Count(&subCount)
+		if subCount > 0 {
+			return ErrPackageInUse
+		}
+		if err := tx.Where("package_version_id = ?", verID).Delete(&ServicePackageFeature{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&ver).Error; err != nil {
+			return err
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &actorID,
+			Action:       "PACKAGE_VERSION_DELETED",
+			ResourceType: "SERVICE_PACKAGE_VERSION",
+			ResourceID:   &ver.ID,
+			BeforeData:   ver,
+			IPAddress:    ip,
+			UserAgent:    ua,
+		})
+	})
 }
 
 type CreateVersionInput struct {

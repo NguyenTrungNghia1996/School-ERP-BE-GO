@@ -176,6 +176,46 @@ func (h *Handler) UpdateOrganization(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, org)
 }
 
+// DeleteOrganization godoc
+// @Summary Xóa mềm Tổ chức (dọn DNS Cloudflare, thu hồi phiên hỗ trợ & xóa cache Redis)
+// @Tags Platform Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Param reason query string false "Lý do xóa tổ chức"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/organizations/{id} [delete]
+func (h *Handler) DeleteOrganization(c *fiber.Ctx) error {
+	orgID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID Tổ chức không hợp lệ", nil)
+	}
+
+	reason := strings.TrimSpace(c.Query("reason"))
+	if reason == "" {
+		var body struct {
+			Reason string `json:"reason"`
+		}
+		if err := c.BodyParser(&body); err == nil {
+			reason = strings.TrimSpace(body.Reason)
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := h.service.DeleteOrganization(ctx, orgID, getActorUUID(c), reason, c.IP(), c.Get("User-Agent")); err != nil {
+		if errors.Is(err, ErrOrgNotFound) {
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy Tổ chức", nil)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa Tổ chức", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_organization_id": orgID})
+}
+
 // ApproveOrganization godoc
 // @Summary Phê duyệt Tổ chức
 // @Tags Platform Organizations
@@ -328,6 +368,84 @@ func (h *Handler) ListReservedSubdomains(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, fiber.StatusOK, items)
+}
+
+// ListOrganizationSchools godoc
+// @Summary Danh sách trường học trực thuộc một Tổ chức
+// @Tags Platform Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Success 200 {object} response.SuccessResponse{data=[]School}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/organizations/{id}/schools [get]
+func (h *Handler) ListOrganizationSchools(c *fiber.Ctx) error {
+	orgID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID Tổ chức không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	schools, err := h.service.ListOrganizationSchools(ctx, orgID)
+	if err != nil {
+		if errors.Is(err, ErrOrgNotFound) {
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy Tổ chức", nil)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể tải danh sách trường trực thuộc", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, schools)
+}
+
+// DeleteReservedSubdomain godoc
+// @Summary Gỡ bỏ từ khóa Subdomain khỏi danh sách giữ chỗ
+// @Tags Platform Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param keyword path string true "Từ khóa subdomain giữ chỗ"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/reserved-subdomains/{keyword} [delete]
+func (h *Handler) DeleteReservedSubdomain(c *fiber.Ctx) error {
+	keyword := strings.TrimSpace(c.Params("keyword"))
+	if keyword == "" {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Từ khóa subdomain không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.DeleteReservedSubdomain(ctx, keyword, getActorUUID(c), c.IP(), c.Get("User-Agent")); err != nil {
+		if errors.Is(err, ErrReservedNotFound) {
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy từ khóa giữ chỗ", nil)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa từ khóa giữ chỗ", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_keyword": strings.ToLower(keyword)})
+}
+
+// GetDashboardStats godoc
+// @Summary Thống kê tổng quan nền tảng cho Dashboard quản trị
+// @Tags Platform Dashboard
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.SuccessResponse{data=DashboardStatsOutput}
+// @Failure 401 {object} response.ErrorResponse
+// @Router /v1/platform/dashboard/stats [get]
+func (h *Handler) GetDashboardStats(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stats, err := h.service.GetDashboardStats(ctx)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể tải thống kê tổng quan", err.Error())
+	}
+	return response.Success(c, fiber.StatusOK, stats)
 }
 
 // AddReservedSubdomain godoc

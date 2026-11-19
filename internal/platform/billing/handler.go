@@ -207,6 +207,114 @@ func (h *Handler) UpdatePackageVersion(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, ver)
 }
 
+// UpdatePackage godoc
+// @Summary Cập nhật thông tin hoặc trạng thái hiển thị của gói dịch vụ
+// @Tags Platform Billing
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Package ID"
+// @Param body body UpdatePackageInput true "Thông tin cập nhật gói"
+// @Success 200 {object} response.SuccessResponse{data=ServicePackage}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/packages/{id} [put]
+// @Router /v1/platform/packages/{id} [patch]
+func (h *Handler) UpdatePackage(c *fiber.Ctx) error {
+	pkgID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID gói dịch vụ không hợp lệ", nil)
+	}
+
+	var body UpdatePackageInput
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu không hợp lệ", err.Error())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	pkg, err := h.service.UpdatePackage(ctx, pkgID, body, getActorUUID(c), c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		if errors.Is(err, ErrPackageNotFound) {
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy gói dịch vụ", nil)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể cập nhật gói dịch vụ", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, pkg)
+}
+
+// DeletePackage godoc
+// @Summary Xóa gói dịch vụ (chỉ cho phép khi chưa có phiên bản PUBLISHED và chưa có Tổ chức đăng ký)
+// @Tags Platform Billing
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Package ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/packages/{id} [delete]
+func (h *Handler) DeletePackage(c *fiber.Ctx) error {
+	pkgID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID gói dịch vụ không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.DeletePackage(ctx, pkgID, getActorUUID(c), c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, ErrPackageNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy gói dịch vụ", nil)
+		case errors.Is(err, ErrPackageInUse):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Gói dịch vụ đã phát hành phiên bản hoặc đang có Tổ chức đăng ký, không thể xóa", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa gói dịch vụ", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_package_id": pkgID})
+}
+
+// DeletePackageVersion godoc
+// @Summary Xóa phiên bản gói dịch vụ đang ở trạng thái DRAFT
+// @Tags Platform Billing
+// @Produce json
+// @Security BearerAuth
+// @Param version_id path string true "Package Version ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/package-versions/{version_id} [delete]
+func (h *Handler) DeletePackageVersion(c *fiber.Ctx) error {
+	verID, err := uuid.Parse(c.Params("version_id", c.Params("id")))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID phiên bản gói dịch vụ không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.DeletePackageVersion(ctx, verID, getActorUUID(c), c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, ErrVersionNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy phiên bản gói dịch vụ", nil)
+		case errors.Is(err, ErrPackageVersionImmutable):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodePackageVersionImmutable, "Chỉ có thể xóa phiên bản đang ở trạng thái DRAFT", nil)
+		case errors.Is(err, ErrPackageInUse):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Phiên bản đang có Tổ chức đăng ký, không thể xóa", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa phiên bản gói dịch vụ", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_version_id": verID})
+}
+
 // PublishPackageVersion godoc
 // @Summary Phát hành (PUBLISH) phiên bản gói dịch vụ
 // @Tags Platform Billing
@@ -245,6 +353,114 @@ func (h *Handler) PublishPackageVersion(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, ver)
 }
 
+// UpdatePackage godoc
+// @Summary Cập nhật thông tin hoặc trạng thái hiển thị của gói dịch vụ
+// @Tags Platform Billing
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Package ID"
+// @Param body body UpdatePackageInput true "Thông tin cập nhật gói"
+// @Success 200 {object} response.SuccessResponse{data=ServicePackage}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/packages/{id} [put]
+// @Router /v1/platform/packages/{id} [patch]
+func (h *Handler) UpdatePackage(c *fiber.Ctx) error {
+	pkgID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID gói dịch vụ không hợp lệ", nil)
+	}
+
+	var body UpdatePackageInput
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu không hợp lệ", err.Error())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	pkg, err := h.service.UpdatePackage(ctx, pkgID, body, getActorUUID(c), c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		if errors.Is(err, ErrPackageNotFound) {
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy gói dịch vụ", nil)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể cập nhật gói dịch vụ", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, pkg)
+}
+
+// DeletePackage godoc
+// @Summary Xóa gói dịch vụ (chỉ cho phép khi chưa có phiên bản PUBLISHED và chưa có Tổ chức đăng ký)
+// @Tags Platform Billing
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Package ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/packages/{id} [delete]
+func (h *Handler) DeletePackage(c *fiber.Ctx) error {
+	pkgID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID gói dịch vụ không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.DeletePackage(ctx, pkgID, getActorUUID(c), c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, ErrPackageNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy gói dịch vụ", nil)
+		case errors.Is(err, ErrPackageInUse):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Gói dịch vụ đã phát hành phiên bản hoặc đang có Tổ chức đăng ký, không thể xóa", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa gói dịch vụ", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_package_id": pkgID})
+}
+
+// DeletePackageVersion godoc
+// @Summary Xóa phiên bản gói dịch vụ đang ở trạng thái DRAFT
+// @Tags Platform Billing
+// @Produce json
+// @Security BearerAuth
+// @Param version_id path string true "Package Version ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/package-versions/{version_id} [delete]
+func (h *Handler) DeletePackageVersion(c *fiber.Ctx) error {
+	verID, err := uuid.Parse(c.Params("version_id", c.Params("id")))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID phiên bản gói dịch vụ không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.DeletePackageVersion(ctx, verID, getActorUUID(c), c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, ErrVersionNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy phiên bản gói dịch vụ", nil)
+		case errors.Is(err, ErrPackageVersionImmutable):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodePackageVersionImmutable, "Chỉ có thể xóa phiên bản đang ở trạng thái DRAFT", nil)
+		case errors.Is(err, ErrPackageInUse):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Phiên bản đang có Tổ chức đăng ký, không thể xóa", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa phiên bản gói dịch vụ", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_version_id": verID})
+}
+
 // DeprecatePackageVersion godoc
 // @Summary Ngừng phát hành (DEPRECATE) phiên bản gói dịch vụ
 // @Tags Platform Billing
@@ -278,6 +494,114 @@ func (h *Handler) DeprecatePackageVersion(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, fiber.StatusOK, ver)
+}
+
+// UpdatePackage godoc
+// @Summary Cập nhật thông tin hoặc trạng thái hiển thị của gói dịch vụ
+// @Tags Platform Billing
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Package ID"
+// @Param body body UpdatePackageInput true "Thông tin cập nhật gói"
+// @Success 200 {object} response.SuccessResponse{data=ServicePackage}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/packages/{id} [put]
+// @Router /v1/platform/packages/{id} [patch]
+func (h *Handler) UpdatePackage(c *fiber.Ctx) error {
+	pkgID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID gói dịch vụ không hợp lệ", nil)
+	}
+
+	var body UpdatePackageInput
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu không hợp lệ", err.Error())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	pkg, err := h.service.UpdatePackage(ctx, pkgID, body, getActorUUID(c), c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		if errors.Is(err, ErrPackageNotFound) {
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy gói dịch vụ", nil)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể cập nhật gói dịch vụ", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, pkg)
+}
+
+// DeletePackage godoc
+// @Summary Xóa gói dịch vụ (chỉ cho phép khi chưa có phiên bản PUBLISHED và chưa có Tổ chức đăng ký)
+// @Tags Platform Billing
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Package ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/packages/{id} [delete]
+func (h *Handler) DeletePackage(c *fiber.Ctx) error {
+	pkgID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID gói dịch vụ không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.DeletePackage(ctx, pkgID, getActorUUID(c), c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, ErrPackageNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy gói dịch vụ", nil)
+		case errors.Is(err, ErrPackageInUse):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Gói dịch vụ đã phát hành phiên bản hoặc đang có Tổ chức đăng ký, không thể xóa", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa gói dịch vụ", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_package_id": pkgID})
+}
+
+// DeletePackageVersion godoc
+// @Summary Xóa phiên bản gói dịch vụ đang ở trạng thái DRAFT
+// @Tags Platform Billing
+// @Produce json
+// @Security BearerAuth
+// @Param version_id path string true "Package Version ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/package-versions/{version_id} [delete]
+func (h *Handler) DeletePackageVersion(c *fiber.Ctx) error {
+	verID, err := uuid.Parse(c.Params("version_id", c.Params("id")))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID phiên bản gói dịch vụ không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.DeletePackageVersion(ctx, verID, getActorUUID(c), c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, ErrVersionNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy phiên bản gói dịch vụ", nil)
+		case errors.Is(err, ErrPackageVersionImmutable):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodePackageVersionImmutable, "Chỉ có thể xóa phiên bản đang ở trạng thái DRAFT", nil)
+		case errors.Is(err, ErrPackageInUse):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Phiên bản đang có Tổ chức đăng ký, không thể xóa", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa phiên bản gói dịch vụ", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_version_id": verID})
 }
 
 // ListOrgSubscriptions godoc

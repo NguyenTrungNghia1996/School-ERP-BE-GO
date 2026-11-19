@@ -193,6 +193,55 @@ func (h *Handler) UpdateUser(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, user)
 }
 
+// DeleteUser godoc
+// @Summary Xóa mềm nhân sự nền tảng (chặn tự xóa & bảo vệ ROOT_ADMIN cuối cùng)
+// @Tags Platform IAM
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param reason query string false "Lý do xóa"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 422 {object} response.ErrorResponse
+// @Router /v1/platform/iam/users/{id} [delete]
+// @Router /v1/platform/users/{id} [delete]
+func (h *Handler) DeleteUser(c *fiber.Ctx) error {
+	targetID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID người dùng không hợp lệ", nil)
+	}
+
+	reason := strings.TrimSpace(c.Query("reason"))
+	if reason == "" {
+		var body struct {
+			Reason string `json:"reason"`
+		}
+		if err := c.BodyParser(&body); err == nil {
+			reason = strings.TrimSpace(body.Reason)
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.DeleteUser(ctx, targetID, getActorUUID(c), reason, c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, ErrSelfModificationNotAllow):
+			return response.Error(c, fiber.StatusForbidden, response.ErrCodeSelfModificationNotAllowed, "Không thể tự xóa tài khoản của chính mình", nil)
+		case errors.Is(err, ErrUserNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy nhân sự nền tảng", nil)
+		case errors.Is(err, ErrLastRootAdmin):
+			return response.Error(c, fiber.StatusUnprocessableEntity, response.ErrCodeLastRootAdminProtected, "Không thể xóa Quản trị viên tối cao (ROOT_ADMIN) hoạt động cuối cùng", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa nhân sự nền tảng", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_user_id": targetID})
+}
+
 // UpdateUserRoles godoc
 // @Summary Cập nhật vai trò nhân sự nền tảng
 // @Tags Platform IAM
@@ -618,6 +667,7 @@ func (h *Handler) ResetUserPassword(c *fiber.Ctx) error {
 // @Failure 400 {object} response.ErrorResponse
 // @Failure 404 {object} response.ErrorResponse
 // @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/iam/users/{id}/mfa/disable [patch]
 // @Router /v1/platform/users/{id}/mfa [delete]
 // @Router /v1/platform/users/{id}/mfa/disable [patch]
 func (h *Handler) ForceDisableUserMFA(c *fiber.Ctx) error {

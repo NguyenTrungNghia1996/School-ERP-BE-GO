@@ -794,6 +794,155 @@ func (s *Service) DeletePlatformFileByAccessURL(ctx context.Context, accessURL s
 	return file.ID, file.ObjectKey, nil
 }
 
+// GetPlatformFileURL resolves the public or presigned URL for an active platform-level file.
+func (s *Service) GetPlatformFileURL(ctx context.Context, fileID uuid.UUID) (*MediaFileURLOutput, error) {
+	var file StoredFile
+	if err := s.db.WithContext(ctx).First(&file, "id = ? AND organization_id IS NULL", fileID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFileNotFound
+		}
+		return nil, err
+	}
+
+	if file.PublicURL != nil && *file.PublicURL != "" {
+		return &MediaFileURLOutput{
+			FileID:    file.ID,
+			ObjectKey: file.ObjectKey,
+			URL:       *file.PublicURL,
+		}, nil
+	}
+
+	if s.store == nil || !s.store.IsConfigured() {
+		return nil, ErrStorageNotConfigured
+	}
+	u, err := s.store.PresignGetURL(ctx, file.ObjectKey, defaultPresignDuration)
+	if err != nil {
+		return nil, err
+	}
+	return &MediaFileURLOutput{
+		FileID:    file.ID,
+		ObjectKey: file.ObjectKey,
+		URL:       u,
+		ExpiresIn: int(defaultPresignDuration.Seconds()),
+	}, nil
+}
+
+// ListPlatformTrash lists soft-deleted platform-level files not yet purged from R2/S3.
+func (s *Service) ListPlatformTrash(ctx context.Context, page, limit int) ([]StoredFile, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	q := s.db.WithContext(ctx).Unscoped().Model(&StoredFile{}).
+		Where("organization_id IS NULL AND deleted_at IS NOT NULL AND purged_at IS NULL")
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var files []StoredFile
+	offset := (page - 1) * limit
+	if err := q.Order("deleted_at DESC").Offset(offset).Limit(limit).Find(&files).Error; err != nil {
+		return nil, 0, err
+	}
+
+	for i := range files {
+		if files[i].DeletedAt.Valid {
+			t := files[i].DeletedAt.Time
+			files[i].TrashedAt = &t
+		}
+		files[i].AccessURL = s.resolveAccessURL(ctx, &files[i])
+	}
+	return files, total, nil
+}
+
+// RestorePlatformFile restores a trashed platform-level file (organization_id IS NULL).
+func (s *Service) RestorePlatformFile(ctx context.Context, fileID, actorID uuid.UUID, ip, ua string) (*StoredFile, error) {
+	var file StoredFile
+	if err := s.db.WithContext(ctx).Unscoped().
+		First(&file, "id = ? AND organization_id IS NULL AND deleted_at IS NOT NULL AND purged_at IS NULL", fileID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFileNotFound
+		}
+		return nil, err
+	}
+
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Model(&StoredFile{}).
+			Where("id = ? AND organization_id IS NULL", file.ID).
+			Update("deleted_at", nil).Error; err != nil {
+			return err
+		}
+		if s.auditor != nil {
+			return s.auditor.Log(tx, audit.AuditEntry{
+				ActorType:    "PLATFORM",
+				ActorID:      &actorID,
+				Action:       "PLATFORM_MEDIA_RESTORED",
+				ResourceType: "STORED_FILE",
+				ResourceID:   &file.ID,
+				AfterData:    map[string]any{"object_key": file.ObjectKey, "size_bytes": file.SizeBytes},
+				IPAddress:    ip,
+				UserAgent:    ua,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	file.DeletedAt = gorm.DeletedAt{}
+	file.TrashedAt = nil
+	file.AccessURL = s.resolveAccessURL(ctx, &file)
+	return &file, nil
+}
+
+// PurgePlatformFile permanently deletes a trashed platform-level file from R2/S3 immediately.
+func (s *Service) PurgePlatformFile(ctx context.Context, fileID, actorID uuid.UUID, ip, ua string) error {
+	if s.store == nil || !s.store.IsConfigured() {
+		return ErrStorageNotConfigured
+	}
+
+	var file StoredFile
+	if err := s.db.WithContext(ctx).Unscoped().
+		First(&file, "id = ? AND organization_id IS NULL AND deleted_at IS NOT NULL AND purged_at IS NULL", fileID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrFileNotFound
+		}
+		return err
+	}
+
+	if err := s.store.DeleteObject(ctx, file.ObjectKey); err != nil {
+		return err
+	}
+
+	now := time.Now().UTC()
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Model(&StoredFile{}).
+			Where("id = ? AND organization_id IS NULL", file.ID).
+			Update("purged_at", now).Error; err != nil {
+			return err
+		}
+		if s.auditor != nil {
+			return s.auditor.Log(tx, audit.AuditEntry{
+				ActorType:    "PLATFORM",
+				ActorID:      &actorID,
+				Action:       "PLATFORM_MEDIA_PURGED",
+				ResourceType: "STORED_FILE",
+				ResourceID:   &file.ID,
+				BeforeData:   map[string]any{"object_key": file.ObjectKey, "size_bytes": file.SizeBytes},
+				IPAddress:    ip,
+				UserAgent:    ua,
+			})
+		}
+		return nil
+	})
+}
+
 // DeleteFileForActor moves a file to Trash (soft-delete in DB + frees org quota).
 // The physical object on R2/S3 is retained for STORAGE_TRASH_RETENTION_DAYS before the cleanup worker purges it.
 func (s *Service) DeleteFileForActor(ctx context.Context, orgID, fileID, actorID uuid.UUID, actorType, ip, ua string) error {

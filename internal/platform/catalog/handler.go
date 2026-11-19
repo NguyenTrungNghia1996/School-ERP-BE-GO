@@ -376,3 +376,270 @@ func (h *Handler) ReorderMenus(c *fiber.Ctx) error {
 
 	return response.Success(c, fiber.StatusOK, fiber.Map{"reordered": len(body.Items)})
 }
+
+// DeleteFeature godoc
+// @Summary Xóa tính năng (Feature) khỏi Catalog (chặn core feature hoặc feature đang sử dụng)
+// @Tags Platform Catalog
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Feature ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/catalog/features/{id} [delete]
+func (h *Handler) DeleteFeature(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID tính năng không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.DeleteFeature(ctx, id, getActorUUID(c), c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, ErrFeatureNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy tính năng", nil)
+		case errors.Is(err, ErrCoreFeatureProtected):
+			return response.Error(c, fiber.StatusForbidden, response.ErrCodePermissionDenied, "Không thể xóa tính năng lõi (is_core = true)", nil)
+		case errors.Is(err, ErrResourceInUse):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Tính năng đang được sử dụng trong gói dịch vụ, quyền, route hoặc menu", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa tính năng", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_feature_id": id})
+}
+
+// DeletePermission godoc
+// @Summary Xóa quyền Tenant khỏi Catalog (chặn nếu đang gán cho vai trò)
+// @Tags Platform Catalog
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Permission ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/catalog/permissions/{id} [delete]
+func (h *Handler) DeletePermission(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID quyền không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.DeletePermission(ctx, id, getActorUUID(c), c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, ErrPermissionNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy quyền", nil)
+		case errors.Is(err, ErrResourceInUse):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Quyền đang được gán cho vai trò của Tổ chức, không thể xóa", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa quyền", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_permission_id": id})
+}
+
+// CreateRoute godoc
+// @Summary Tạo mới Tenant Route trong Catalog
+// @Tags Platform Catalog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body CreateRouteInput true "Thông tin route"
+// @Success 201 {object} response.SuccessResponse{data=TenantRoute}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/catalog/routes [post]
+func (h *Handler) CreateRoute(c *fiber.Ctx) error {
+	var body CreateRouteInput
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu không hợp lệ", err.Error())
+	}
+	if strings.TrimSpace(body.RouteKey) == "" || strings.TrimSpace(body.Path) == "" || strings.TrimSpace(body.Name) == "" {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "route_key, path và name là bắt buộc", nil)
+	}
+
+	body.ActorID = getActorUUID(c)
+	body.IPAddress = c.IP()
+	body.UserAgent = c.Get("User-Agent")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	r, err := h.service.CreateRoute(ctx, body)
+	if err != nil {
+		if errors.Is(err, ErrCodeAlreadyExists) {
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "route_key hoặc path đã tồn tại", nil)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể tạo route", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusCreated, r)
+}
+
+// UpdateRoute godoc
+// @Summary Cập nhật Tenant Route trong Catalog
+// @Tags Platform Catalog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Route ID"
+// @Param body body UpdateRouteInput true "Thông tin cập nhật route"
+// @Success 200 {object} response.SuccessResponse{data=TenantRoute}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/catalog/routes/{id} [put]
+func (h *Handler) UpdateRoute(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID route không hợp lệ", nil)
+	}
+
+	var body UpdateRouteInput
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu không hợp lệ", err.Error())
+	}
+	body.ActorID = getActorUUID(c)
+	body.IPAddress = c.IP()
+	body.UserAgent = c.Get("User-Agent")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	r, err := h.service.UpdateRoute(ctx, id, body)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrRouteNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy route", nil)
+		case errors.Is(err, ErrCodeAlreadyExists):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "route_key hoặc path đã tồn tại", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể cập nhật route", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, r)
+}
+
+// DeleteRoute godoc
+// @Summary Xóa Tenant Route khỏi Catalog (chặn nếu đang được menu tham chiếu)
+// @Tags Platform Catalog
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Route ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/catalog/routes/{id} [delete]
+func (h *Handler) DeleteRoute(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID route không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.DeleteRoute(ctx, id, getActorUUID(c), c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, ErrRouteNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy route", nil)
+		case errors.Is(err, ErrResourceInUse):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Route đang được menu tham chiếu, không thể xóa", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa route", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_route_id": id})
+}
+
+// UpdateMenu godoc
+// @Summary Cập nhật node Menu nền của Tenant (nhãn, icon, route, quyền, thứ tự, trạng thái)
+// @Tags Platform Catalog
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Menu ID"
+// @Param body body UpdateMenuInput true "Thông tin cập nhật menu"
+// @Success 200 {object} response.SuccessResponse{data=TenantBaseMenu}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/catalog/menus/{id} [put]
+// @Router /v1/platform/catalog/menus/{id} [patch]
+func (h *Handler) UpdateMenu(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID menu không hợp lệ", nil)
+	}
+
+	var body UpdateMenuInput
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu không hợp lệ", err.Error())
+	}
+	body.ActorID = getActorUUID(c)
+	body.IPAddress = c.IP()
+	body.UserAgent = c.Get("User-Agent")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	node, err := h.service.UpdateMenu(ctx, id, body)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrMenuNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy mục menu", nil)
+		case errors.Is(err, ErrRouteNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy route_id", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể cập nhật mục menu", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, node)
+}
+
+// DeleteMenu godoc
+// @Summary Xóa node Menu nền của Tenant (chặn nếu còn mục con)
+// @Tags Platform Catalog
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Menu ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /v1/platform/catalog/menus/{id} [delete]
+func (h *Handler) DeleteMenu(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID menu không hợp lệ", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.DeleteMenu(ctx, id, getActorUUID(c), c.IP(), c.Get("User-Agent")); err != nil {
+		switch {
+		case errors.Is(err, ErrMenuNotFound):
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy mục menu", nil)
+		case errors.Is(err, ErrMenuHasChildren):
+			return response.Error(c, fiber.StatusConflict, response.ErrCodeConflict, "Mục menu vẫn còn menu con, vui lòng xóa hoặc di chuyển menu con trước", nil)
+		default:
+			return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể xóa mục menu", err.Error())
+		}
+	}
+
+	return response.Success(c, fiber.StatusOK, fiber.Map{"deleted_menu_id": id})
+}

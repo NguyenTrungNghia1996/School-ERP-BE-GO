@@ -21,6 +21,7 @@ import (
 var (
 	ErrOrgNotFound              = errors.New("organization not found")
 	ErrHistoryNotFound          = errors.New("subdomain history not found")
+	ErrReservedNotFound         = errors.New("reserved subdomain keyword not found")
 	ErrSubdomainInvalidFormat   = errors.New("invalid subdomain format")
 	ErrSubdomainReservedOrTaken = errors.New("subdomain is reserved or already taken")
 	ErrOrgNotPending            = errors.New("organization is not in PENDING_APPROVAL status")
@@ -205,6 +206,114 @@ func (s *Service) GetOrganizationDetail(ctx context.Context, orgID uuid.UUID) (m
 		"subscriptions":       subscriptions,
 		"subdomain_histories": histories,
 	}, nil
+}
+
+// ListOrganizationSchools returns all active schools belonging to an organization.
+func (s *Service) ListOrganizationSchools(ctx context.Context, orgID uuid.UUID) ([]School, error) {
+	var count int64
+	if err := s.db.WithContext(ctx).Model(&Organization{}).Where("id = ?", orgID).Count(&count).Error; err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return nil, ErrOrgNotFound
+	}
+
+	var schools []School
+	if err := s.db.WithContext(ctx).Where("organization_id = ?", orgID).Order("is_main DESC, created_at ASC").Find(&schools).Error; err != nil {
+		return nil, err
+	}
+	return schools, nil
+}
+
+// DeleteReservedSubdomain removes a keyword from reserved_subdomains.
+func (s *Service) DeleteReservedSubdomain(ctx context.Context, keyword string, actorID uuid.UUID, ip, ua string) error {
+	kw := strings.ToLower(strings.TrimSpace(keyword))
+	var item ReservedSubdomain
+	if err := s.db.WithContext(ctx).First(&item, "LOWER(keyword) = ?", kw).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrReservedNotFound
+		}
+		return err
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&item).Error; err != nil {
+			return err
+		}
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:    "PLATFORM",
+			ActorID:      &actorID,
+			Action:       "RESERVED_SUBDOMAIN_DELETED",
+			ResourceType: "RESERVED_SUBDOMAIN",
+			BeforeData:   map[string]any{"keyword": item.Keyword, "reason": item.Reason},
+			IPAddress:    ip,
+			UserAgent:    ua,
+		})
+	})
+}
+
+type DashboardStatsOutput struct {
+	Organizations struct {
+		Total           int64 `json:"total"`
+		PendingApproval int64 `json:"pending_approval"`
+		Active          int64 `json:"active"`
+		Suspended       int64 `json:"suspended"`
+		Archived        int64 `json:"archived"`
+		DNSFailed       int64 `json:"dns_failed"`
+		DNSProvisioning int64 `json:"dns_provisioning"`
+	} `json:"organizations"`
+	SchoolsTotal  int64 `json:"schools_total"`
+	Subscriptions struct {
+		Active          int64 `json:"active"`
+		ExpiringSoon30d int64 `json:"expiring_soon_30d"`
+		Expired         int64 `json:"expired"`
+	} `json:"subscriptions"`
+	SupportSessions struct {
+		Pending int64 `json:"pending"`
+		Active  int64 `json:"active"`
+	} `json:"support_sessions"`
+	PlatformUsers struct {
+		Total  int64 `json:"total"`
+		Active int64 `json:"active"`
+	} `json:"platform_users"`
+	Storage struct {
+		TotalUsedBytes int64 `json:"total_used_bytes"`
+		TotalFiles     int64 `json:"total_files"`
+	} `json:"storage"`
+}
+
+// GetDashboardStats aggregates key platform metrics for the admin overview dashboard.
+func (s *Service) GetDashboardStats(ctx context.Context) (*DashboardStatsOutput, error) {
+	out := &DashboardStatsOutput{}
+	db := s.db.WithContext(ctx)
+
+	db.Model(&Organization{}).Count(&out.Organizations.Total)
+	db.Model(&Organization{}).Where("status = 'PENDING_APPROVAL'").Count(&out.Organizations.PendingApproval)
+	db.Model(&Organization{}).Where("status = 'ACTIVE'").Count(&out.Organizations.Active)
+	db.Model(&Organization{}).Where("status = 'SUSPENDED'").Count(&out.Organizations.Suspended)
+	db.Model(&Organization{}).Where("status = 'ARCHIVED'").Count(&out.Organizations.Archived)
+	db.Model(&Organization{}).Where("dns_status = 'FAILED'").Count(&out.Organizations.DNSFailed)
+	db.Model(&Organization{}).Where("dns_status = 'PROVISIONING'").Count(&out.Organizations.DNSProvisioning)
+
+	db.Model(&School{}).Count(&out.SchoolsTotal)
+
+	now := time.Now().UTC()
+	in30d := now.AddDate(0, 0, 30)
+	db.Table("organization_subscriptions").Where("status = 'ACTIVE' AND expires_at > ?", now).Count(&out.Subscriptions.Active)
+	db.Table("organization_subscriptions").Where("status = 'ACTIVE' AND expires_at > ? AND expires_at <= ?", now, in30d).Count(&out.Subscriptions.ExpiringSoon30d)
+	db.Table("organization_subscriptions").Where("status = 'EXPIRED' OR (status = 'ACTIVE' AND expires_at <= ?)", now).Count(&out.Subscriptions.Expired)
+
+	db.Table("support_access_sessions").Where("status = 'PENDING'").Count(&out.SupportSessions.Pending)
+	db.Table("support_access_sessions").Where("status = 'ACTIVE' AND expires_at > ?", now).Count(&out.SupportSessions.Active)
+
+	db.Table("platform_users").Where("deleted_at IS NULL").Count(&out.PlatformUsers.Total)
+	db.Table("platform_users").Where("deleted_at IS NULL AND status = 'ACTIVE'").Count(&out.PlatformUsers.Active)
+
+	db.Table("organization_storage_usages").
+		Select("COALESCE(SUM(used_bytes), 0), COALESCE(SUM(file_count), 0)").
+		Row().Scan(&out.Storage.TotalUsedBytes, &out.Storage.TotalFiles)
+
+	return out, nil
 }
 
 type CreateOrganizationInput struct {
@@ -521,6 +630,86 @@ func (s *Service) UpdateOrganization(ctx context.Context, orgID uuid.UUID, input
 
 	_ = s.db.WithContext(ctx).First(&org, "id = ?", orgID).Error
 	return &org, nil
+}
+
+// DeleteOrganization soft-deletes an organization, cleans up its Cloudflare DNS record (best-effort),
+// archives schools, revokes active support sessions, and clears tenant Redis caches.
+func (s *Service) DeleteOrganization(ctx context.Context, orgID, actorID uuid.UUID, reason, ip, ua string) error {
+	var org Organization
+	if err := s.db.WithContext(ctx).First(&org, "id = ?", orgID).Error; err != nil {
+		return ErrOrgNotFound
+	}
+
+	// Best-effort xóa bản ghi DNS trên Cloudflare nếu đã cấp phát
+	if org.CloudflareDNSRecordID != nil && *org.CloudflareDNSRecordID != "" && s.cf != nil && s.cf.IsConfigured() {
+		_ = s.cf.DeleteRecord(ctx, *org.CloudflareDNSRecordID)
+	}
+
+	now := time.Now()
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Soft-delete toàn bộ trường trực thuộc
+		if err := tx.Model(&School{}).
+			Where("organization_id = ? AND deleted_at IS NULL", org.ID).
+			Updates(map[string]any{
+				"status":     "INACTIVE",
+				"updated_at": now,
+				"deleted_at": now,
+			}).Error; err != nil {
+			return err
+		}
+
+		// Thu hồi toàn bộ support session đang hoạt động của tổ chức
+		_ = tx.Table("support_access_sessions").
+			Where("organization_id = ? AND status IN ('PENDING', 'APPROVED', 'ACTIVE')", org.ID).
+			Updates(map[string]any{
+				"status":     "REVOKED",
+				"revoked_at": now,
+			}).Error
+
+		if err := tx.Model(&org).Updates(map[string]any{
+			"status":                   "ARCHIVED",
+			"status_reason":            reason,
+			"dns_status":               "DELETING",
+			"cloudflare_dns_record_id": nil,
+			"updated_at":               now,
+		}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&org).Error; err != nil {
+			return err
+		}
+
+		return s.auditor.Log(tx, audit.AuditEntry{
+			ActorType:      "PLATFORM",
+			ActorID:        &actorID,
+			OrganizationID: &org.ID,
+			Action:         "ORG_DELETED",
+			ResourceType:   "ORGANIZATION",
+			ResourceID:     &org.ID,
+			BeforeData: map[string]any{
+				"id":        org.ID,
+				"code":      org.Code,
+				"name":      org.Name,
+				"subdomain": org.Subdomain,
+				"status":    org.Status,
+			},
+			Reason:    reason,
+			IPAddress: ip,
+			UserAgent: ua,
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	if s.rdb != nil {
+		pipe := s.rdb.Pipeline()
+		pipe.Del(ctx, rediskeys.TenantSubdomainKey(org.Subdomain))
+		pipe.Del(ctx, rediskeys.TenantEntitlementKey(org.ID.String()))
+		_, _ = pipe.Exec(ctx)
+	}
+	return nil
 }
 
 func (s *Service) ApproveOrganization(ctx context.Context, orgID, actorID uuid.UUID, ip, ua string) (*Organization, error) {
