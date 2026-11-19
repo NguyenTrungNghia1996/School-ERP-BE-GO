@@ -213,6 +213,7 @@ func (s *Service) GetMe(ctx context.Context, userID string, permissions []string
 			"id":          user.ID,
 			"email":       user.Email,
 			"full_name":   user.FullName,
+			"phone":       user.Phone,
 			"avatar_url":  user.AvatarURL,
 			"mfa_enabled": user.MFAEnabled,
 		},
@@ -220,6 +221,48 @@ func (s *Service) GetMe(ctx context.Context, userID string, permissions []string
 		Permissions: permissions,
 		Menus:       menus,
 	}, nil
+}
+
+type UpdateMeInput struct {
+	FullName  *string `json:"full_name" example:"Nguyễn Văn A"`
+	Phone     *string `json:"phone" example:"0912345678"`
+	AvatarURL *string `json:"avatar_url" example:"https://cdn.nghia196.qzz.io/platform/avatars/admin.png"`
+}
+
+func (s *Service) UpdateMe(ctx context.Context, userID string, input UpdateMeInput) (*iam.PlatformUser, error) {
+	var user iam.PlatformUser
+	if err := s.db.WithContext(ctx).First(&user, "id = ?", userID).Error; err != nil {
+		return nil, err
+	}
+
+	updates := map[string]any{"updated_at": time.Now()}
+	if input.FullName != nil {
+		if trimmed := strings.TrimSpace(*input.FullName); trimmed != "" {
+			updates["full_name"] = trimmed
+		}
+	}
+	if input.Phone != nil {
+		if trimmed := strings.TrimSpace(*input.Phone); trimmed != "" {
+			updates["phone"] = trimmed
+		} else {
+			updates["phone"] = nil
+		}
+	}
+	if input.AvatarURL != nil {
+		if trimmed := strings.TrimSpace(*input.AvatarURL); trimmed != "" {
+			updates["avatar_url"] = trimmed
+		} else {
+			updates["avatar_url"] = nil
+		}
+	}
+
+	if err := s.db.WithContext(ctx).Model(&user).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	if err := s.db.WithContext(ctx).Preload("Roles").First(&user, "id = ?", userID).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 type MFASetupOutput struct {

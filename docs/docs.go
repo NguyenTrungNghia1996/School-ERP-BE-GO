@@ -3551,6 +3551,66 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Platform Auth"
+                ],
+                "summary": "Cập nhật hồ sơ cá nhân Platform Admin (full_name, phone, avatar_url)",
+                "parameters": [
+                    {
+                        "description": "Thông tin hồ sơ cập nhật",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.UpdateMeInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/iam.PlatformUser"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/v1/platform/me/change-password": {
@@ -4085,6 +4145,73 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/tenant_mgmt.Organization"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Platform Organizations"
+                ],
+                "summary": "Cập nhật thông tin Tổ chức (tên, logo_url, liên hệ, mã số thuế, địa chỉ)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Organization ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Thông tin cập nhật",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/tenant_mgmt.UpdateOrganizationInput"
+                        }
                     }
                 ],
                 "responses": {
@@ -7665,6 +7792,23 @@ const docTemplate = `{
                 }
             }
         },
+        "auth.UpdateMeInput": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string",
+                    "example": "https://cdn.nghia196.qzz.io/platform/avatars/admin.png"
+                },
+                "full_name": {
+                    "type": "string",
+                    "example": "Nguyễn Văn A"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "0912345678"
+                }
+            }
+        },
         "billing.ActivePackageSummary": {
             "type": "object",
             "properties": {
@@ -8501,6 +8645,10 @@ const docTemplate = `{
         "iam.CreateUserInput": {
             "type": "object",
             "properties": {
+                "avatar_url": {
+                    "type": "string",
+                    "example": "https://cdn.nghia196.qzz.io/platform/avatars/admin.png"
+                },
                 "email": {
                     "type": "string",
                     "example": "cskh.hanoi@school-erp.vn"
@@ -8772,6 +8920,9 @@ const docTemplate = `{
         "iam.RoleUserSummary": {
             "type": "object",
             "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -9000,6 +9151,10 @@ const docTemplate = `{
         "iam.UpdateUserInput": {
             "type": "object",
             "properties": {
+                "avatar_url": {
+                    "type": "string",
+                    "example": "https://cdn.nghia196.qzz.io/platform/avatars/admin.png"
+                },
                 "full_name": {
                     "type": "string",
                     "example": "Trần Minh Anh"
@@ -9845,6 +10000,9 @@ const docTemplate = `{
                 "contact_phone": {
                     "type": "string"
                 },
+                "logo_url": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -9861,6 +10019,9 @@ const docTemplate = `{
                             "type": "string"
                         },
                         "level": {
+                            "type": "string"
+                        },
+                        "logo_url": {
                             "type": "string"
                         },
                         "name": {
@@ -9916,6 +10077,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
+                    "type": "string"
+                },
+                "logo_url": {
                     "type": "string"
                 },
                 "name": {
@@ -10015,6 +10179,9 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "logo_url": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -10098,6 +10265,35 @@ const docTemplate = `{
                 "valid": {
                     "type": "boolean",
                     "example": true
+                }
+            }
+        },
+        "tenant_mgmt.UpdateOrganizationInput": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "example": "Số 10 Thụy Khuê, Tây Hồ, Hà Nội"
+                },
+                "contact_email": {
+                    "type": "string",
+                    "example": "contact@chuvanan.edu.vn"
+                },
+                "contact_phone": {
+                    "type": "string",
+                    "example": "02438889999"
+                },
+                "logo_url": {
+                    "type": "string",
+                    "example": "https://cdn.nghia196.qzz.io/orgs/.../logo.png"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Hệ thống Trường THPT Chu Văn An"
+                },
+                "tax_code": {
+                    "type": "string",
+                    "example": "0101234567"
                 }
             }
         }

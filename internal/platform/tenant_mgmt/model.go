@@ -12,6 +12,7 @@ type Organization struct {
 	Code                  string         `json:"code" gorm:"column:code;type:varchar(50);not null;unique"`
 	Name                  string         `json:"name" gorm:"column:name;type:varchar(200);not null"`
 	Subdomain             string         `json:"subdomain" gorm:"column:subdomain;type:varchar(40);not null"`
+	LogoURL               *string        `json:"logo_url" gorm:"column:logo_url;type:text"`
 	ContactEmail          *string        `json:"contact_email" gorm:"column:contact_email;type:varchar(255)"`
 	ContactPhone          *string        `json:"contact_phone" gorm:"column:contact_phone;type:varchar(30)"`
 	TaxCode               *string        `json:"tax_code" gorm:"column:tax_code;type:varchar(50)"`
@@ -42,6 +43,7 @@ type School struct {
 	Email          *string        `json:"email" gorm:"column:email;type:varchar(255)"`
 	Phone          *string        `json:"phone" gorm:"column:phone;type:varchar(30)"`
 	Address        *string        `json:"address" gorm:"column:address;type:text"`
+	LogoURL        *string        `json:"logo_url" gorm:"column:logo_url;type:text"`
 	IsMain         bool           `json:"is_main" gorm:"column:is_main;not null;default:false"`
 	Status         string         `json:"status" gorm:"column:status;type:varchar(20);not null;default:'ACTIVE'"`
 	CreatedAt      time.Time      `json:"created_at" gorm:"column:created_at"`

@@ -136,6 +136,13 @@ func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*Platf
 		return nil, err
 	}
 
+	var avatarURL *string
+	if input.AvatarURL != nil {
+		if trimmed := strings.TrimSpace(*input.AvatarURL); trimmed != "" {
+			avatarURL = &trimmed
+		}
+	}
+
 	roleIDs := dedupeUUIDs(input.RoleIDs)
 	user := &PlatformUser{
 		ID:                 uuid.New(),
@@ -143,6 +150,7 @@ func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*Platf
 		PasswordHash:       string(hashedBytes),
 		FullName:           strings.TrimSpace(input.FullName),
 		Phone:              input.Phone,
+		AvatarURL:          avatarURL,
 		Status:             "ACTIVE",
 		MustChangePassword: input.MustChangePassword,
 	}
@@ -204,6 +212,13 @@ func (s *Service) UpdateUser(ctx context.Context, targetUserID uuid.UUID, input 
 	if input.Phone != nil {
 		updates["phone"] = input.Phone
 	}
+	if input.AvatarURL != nil {
+		if trimmed := strings.TrimSpace(*input.AvatarURL); trimmed != "" {
+			updates["avatar_url"] = trimmed
+		} else {
+			updates["avatar_url"] = nil
+		}
+	}
 
 	oldStatus := user.Status
 	newStatus := oldStatus
@@ -235,7 +250,7 @@ func (s *Service) UpdateUser(ctx context.Context, targetUserID uuid.UUID, input 
 			Action:       "PLATFORM_USER_UPDATED",
 			ResourceType: "PLATFORM_USER",
 			ResourceID:   &targetUserID,
-			BeforeData:   map[string]any{"full_name": user.FullName, "phone": user.Phone, "status": oldStatus},
+			BeforeData:   map[string]any{"full_name": user.FullName, "phone": user.Phone, "avatar_url": user.AvatarURL, "status": oldStatus},
 			AfterData:    updates,
 			Reason:       input.Reason,
 			IPAddress:    input.IPAddress,

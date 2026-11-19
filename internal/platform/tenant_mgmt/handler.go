@@ -139,6 +139,43 @@ func (h *Handler) CreateOrganization(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusCreated, result)
 }
 
+// UpdateOrganization godoc
+// @Summary Cập nhật thông tin Tổ chức (tên, logo_url, liên hệ, mã số thuế, địa chỉ)
+// @Tags Platform Organizations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Param body body UpdateOrganizationInput true "Thông tin cập nhật"
+// @Success 200 {object} response.SuccessResponse{data=Organization}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /v1/platform/organizations/{id} [patch]
+func (h *Handler) UpdateOrganization(c *fiber.Ctx) error {
+	orgID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "ID Tổ chức không hợp lệ", nil)
+	}
+
+	var body UpdateOrganizationInput
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, response.ErrCodeValidationFailed, "Dữ liệu đầu vào không hợp lệ", err.Error())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	org, err := h.service.UpdateOrganization(ctx, orgID, body, getActorUUID(c), c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		if errors.Is(err, ErrOrgNotFound) {
+			return response.Error(c, fiber.StatusNotFound, response.ErrCodeNotFound, "Không tìm thấy Tổ chức", nil)
+		}
+		return response.Error(c, fiber.StatusInternalServerError, response.ErrCodeInternalError, "Không thể cập nhật Tổ chức", err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, org)
+}
+
 // ApproveOrganization godoc
 // @Summary Phê duyệt Tổ chức
 // @Tags Platform Organizations
