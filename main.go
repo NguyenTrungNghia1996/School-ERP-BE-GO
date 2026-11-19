@@ -31,6 +31,8 @@ func main() {
 
 	if err := seed.Run(config.DB); err != nil {
 		log.Printf("⚠️ Lỗi chạy seed dữ liệu: %v\n", err)
+	} else {
+		seed.InvalidateCaches(config.RedisClient)
 	}
 
 	platformmedia.NewService(config.DB, config.StorageClient, nil, nil).StartTrashCleanupWorker(context.Background())

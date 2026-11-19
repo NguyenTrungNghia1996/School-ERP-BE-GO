@@ -27,6 +27,14 @@ func Run(db *gorm.DB) error {
 		fullName = "Super Admin"
 	}
 
+	if err := EnsurePlatformPermissionsAndMenus(db); err != nil {
+		return err
+	}
+
+	if err := EnsureTenantCatalog(db); err != nil {
+		return err
+	}
+
 	if err := EnsureRootAdmin(db, email, password, fullName); err != nil {
 		return err
 	}

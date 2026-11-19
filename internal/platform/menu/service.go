@@ -115,9 +115,6 @@ func filterNodesBottomUp(nodes []AntDMenuNode, permSet map[string]bool) []AntDMe
 		if node.Type == "SUBMENU" || node.Type == "GROUP" {
 			if len(filteredChildren) > 0 {
 				clone := node
-				clone.ID = uuid.Nil
-				clone.RequiredPermissionCode = nil
-				clone.SortOrder = 0
 				clone.Children = filteredChildren
 				result = append(result, clone)
 			}
@@ -131,9 +128,6 @@ func filterNodesBottomUp(nodes []AntDMenuNode, permSet map[string]bool) []AntDMe
 		}
 		if reqPerm == "" || permSet[reqPerm] {
 			clone := node
-			clone.ID = uuid.Nil
-			clone.RequiredPermissionCode = nil
-			clone.SortOrder = 0
 			clone.Children = nil
 			result = append(result, clone)
 		}
